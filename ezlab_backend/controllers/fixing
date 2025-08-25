@@ -1,0 +1,699 @@
+// lib/product_page.dart
+import 'package:ezlab_frontend/users_page.dart';
+import 'package:ezlab_frontend/login.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ezlab_frontend/constants.dart';
+
+class ProductPage extends StatefulWidget {
+  const ProductPage({Key? key}) : super(key: key);
+
+  @override
+  _ProductPageState createState() => _ProductPageState();
+}
+
+class _ProductPageState extends State<ProductPage> with TickerProviderStateMixin {
+  List<Map<String, dynamic>> _products = [];
+  final _formKey = GlobalKey<FormState>();
+  final _productNameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _priceController = TextEditingController();
+  final _quantityController = TextEditingController();
+  bool _isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
+  List<Map<String, dynamic>> _filteredProducts = [];
+  String _userRole = '';
+  final Map<int, AnimationController> _cardAnimationControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+    _fetchProducts();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userRole = prefs.getString('role') ?? '';
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    _productNameController.dispose();
+    _descriptionController.dispose();
+    _priceController.dispose();
+    _quantityController.dispose();
+    _disposeCardAnimationControllers();
+    super.dispose();
+  }
+
+  void _onSearchChanged() => _searchProducts(_searchController.text);
+
+  Future<void> _fetchProducts() async {
+    setState(() {
+      _isLoading = true;
+      _searchController.clear();
+      _products = [];
+      _filteredProducts = [];
+      _disposeCardAnimationControllers();
+    });
+
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/api/products'));
+      if (response.statusCode == 200) {
+        final products = List<Map<String, dynamic>>.from(json.decode(response.body));
+        setState(() {
+          _products = products;
+          _filteredProducts = products;
+          _isLoading = false;
+        });
+        _initCardAnimations();
+      } else {
+        setState(() => _isLoading = false);
+        _showSnackBar('Failed to fetch products: ${response.statusCode}', isError: true);
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showSnackBar('Error fetching products: $e', isError: true);
+    }
+  }
+
+  void _disposeCardAnimationControllers() {
+    _cardAnimationControllers.values.forEach((controller) => controller.dispose());
+    _cardAnimationControllers.clear();
+  }
+
+  void _initCardAnimations() {
+    if (_filteredProducts.isNotEmpty) {
+      _disposeCardAnimationControllers();
+      for (int i = 0; i < _filteredProducts.length; i++) {
+        final productId = _filteredProducts[i]['id'] as int;
+        if (!_cardAnimationControllers.containsKey(productId)) {
+          final controller = AnimationController(
+            vsync: this,
+            duration: Duration(milliseconds: 300 + i * 50),
+          );
+          _cardAnimationControllers[productId] = controller;
+          Future.delayed(Duration(milliseconds: 50 * i), () {
+            if (mounted && controller.status == AnimationStatus.dismissed) {
+              controller.forward();
+            }
+          });
+        }
+      }
+    }
+  }
+
+  void _searchProducts(String query) {
+    final lowerQuery = query.toLowerCase();
+    setState(() {
+      _filteredProducts = _products.where((product) {
+        final name = product['name']?.toLowerCase() ?? '';
+        final description = product['description']?.toLowerCase() ?? '';
+        return name.contains(lowerQuery) || description.contains(lowerQuery);
+      }).toList();
+    });
+  }
+
+  Future<void> _addProduct() async {
+    if (_formKey.currentState!.validate()) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('auth_token') ?? '';
+
+        final response = await http.post(
+          Uri.parse('$baseUrl/api/products'),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({
+            'name': _productNameController.text,
+            'description': _descriptionController.text,
+            'price': double.parse(_priceController.text),
+            'quantity': int.parse(_quantityController.text),
+          }),
+        );
+
+        if (response.statusCode == 200) {
+          _showSnackBar('Product added successfully');
+          _fetchProducts();
+          Navigator.pop(context);
+          _clearForm();
+        } else {
+          _handleErrorResponse(response, 'add product');
+        }
+      } catch (e) {
+        _showSnackBar('Error adding product: $e', isError: true);
+      }
+    }
+  }
+
+  Future<void> _deleteProduct(int id) async {
+    final bool? confirmDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content: const Text('Are you sure you want to delete this product?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmDelete == true) {
+      final controller = _cardAnimationControllers[id];
+      if (controller != null && controller.status != AnimationStatus.dismissed) {
+        controller.reverse().then((_) async {
+          _cardAnimationControllers.remove(id);
+          await _performDeleteRequest(id);
+        });
+      } else {
+        await _performDeleteRequest(id);
+      }
+    }
+  }
+
+  Future<void> _performDeleteRequest(int id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token') ?? '';
+
+      final response = await http.delete(
+        Uri.parse('$baseUrl/api/products/$id'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        _showSnackBar('Product deleted successfully');
+        _fetchProducts();
+      } else {
+        _handleErrorResponse(response, 'delete product');
+      }
+    } catch (e) {
+      _showSnackBar('Error deleting product: $e', isError: true);
+    }
+  }
+
+  void _handleErrorResponse(http.Response response, String operation) {
+    String errorMessage = 'Failed to $operation';
+    if (response.body.isNotEmpty) {
+      try {
+        final errorData = json.decode(response.body);
+        errorMessage = errorData['message'] ?? errorMessage;
+      } catch (_) {}
+    }
+    _showSnackBar(errorMessage, isError: true);
+  }
+
+  void _clearForm() {
+    _productNameController.clear();
+    _descriptionController.clear();
+    _priceController.clear();
+    _quantityController.clear();
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.danger : AppColors.primaryDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _showAddProductDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardBackground,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 24,
+          right: 24,
+          top: 32,
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+            Text(
+            'Add New Product',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _buildTextField(controller: _productNameController, label: 'Product Name'),
+          const SizedBox(height: 16),
+          _buildTextField(controller: _descriptionController, label: 'Description', maxLines: 3),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: _buildTextField(controller: _priceController, label: 'Price', isNumber: true)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildTextField(controller: _quantityController, label: 'Quantity', isNumber: true)),
+            ],
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton(
+            onPressed: _addProduct,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              minimumSize: const Size(double.infinity, 56),
+            ),
+            child: const Text('Add Product', style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddUserDialog() {
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Text('Add New User', style: Theme.of(context).textTheme.titleLarge),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTextField(controller: usernameController, label: 'Username'),
+            const SizedBox(height: 16),
+            _buildTextField(controller: passwordController, label: 'Password'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token') ?? '';
+
+                final response = await http.post(
+                  Uri.parse('$baseUrl/auth/register'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: json.encode({
+                    'username': usernameController.text,
+                    'password': passwordController.text,
+                  }),
+                );
+
+                if (response.statusCode == 200) {
+                  Navigator.pop(context);
+                  _showSnackBar('User added successfully');
+                } else {
+                  _handleErrorResponse(response, 'add user');
+                }
+              } catch (e) {
+                _showSnackBar('Error adding user: $e', isError: true);
+              }
+            },
+            child: const Text('Add User'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    await prefs.clear();
+
+    if (token != null) {
+      try {
+        await http.post(
+          Uri.parse('$baseUrl/auth/logout'),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+      } catch (e) {
+        print('Logout error: $e');
+      }
+    }
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => LoginPage()),
+            (Route<dynamic> route) => false,
+      );
+    }
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    int maxLines = 1,
+    bool isNumber = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        filled: true,
+        fillColor: AppColors.background,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: (value) => value!.isEmpty ? 'This field is required' : null,
+    );
+  }
+
+  Widget _buildDrawerHeader() {
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        final username = snapshot.data?.getString('username') ?? 'User';
+        final role = snapshot.data?.getString('role') ?? 'user';
+
+        return UserAccountsDrawerHeader(
+          accountName: Text(username, style: const TextStyle(fontWeight: FontWeight.bold)),
+          accountEmail: Text("Role: ${role.toUpperCase()}"),
+          currentAccountPicture: CircleAvatar(
+            backgroundColor: AppColors.accent,
+            child: Text(username.isNotEmpty ? username[0].toUpperCase() : 'U'),
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primaryDark, AppColors.primary],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canManageProducts = _userRole == 'admin' || _userRole == 'super_admin';
+    final canManageUsers = _userRole == 'admin' || _userRole == 'super_admin';
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Ezlab CRM Dashboard', style: TextStyle(color: Colors.white)),
+        backgroundColor: AppColors.primary,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      drawer: _buildDrawer(canManageProducts, canManageUsers),
+      floatingActionButton: canManageProducts ? FloatingActionButton.extended(
+        onPressed: _showAddProductDialog,
+        backgroundColor: AppColors.accent,
+        label: const Text('Add Product'),
+      ) : null,
+      body: _buildBodyContent(canManageProducts),
+    );
+  }
+
+  Widget _buildDrawer(bool canManageProducts, bool canManageUsers) {
+    return Drawer(
+      backgroundColor: AppColors.cardBackground,
+      child: Column(
+        children: [
+          _buildDrawerHeader(),
+          Expanded(
+            child: ListView(
+              children: [
+                if (canManageProducts) _buildDrawerTile(
+                  icon: Icons.add_box,
+                  title: 'Add Product',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAddProductDialog();
+                  },
+                ),
+                if (canManageUsers) ...[
+                  _buildDrawerTile(
+                    icon: Icons.person_add,
+                    title: 'Add User',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showAddUserDialog();
+                    },
+                  ),
+                  _buildDrawerTile(
+                    icon: Icons.people,
+                    title: 'Manage Users',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UsersPage())),
+                  ),
+                ],
+                const Divider(),
+                _buildDrawerTile(
+                  icon: Icons.logout,
+                  title: 'Logout',
+                  textColor: AppColors.danger,
+                  iconColor: AppColors.danger,
+                  onTap: _logout,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBodyContent(bool canManageProducts) {
+    return _isLoading
+        ? Center(child: CircularProgressIndicator(color: AppColors.primary))
+        : RefreshIndicator(
+      onRefresh: _fetchProducts,
+      color: AppColors.primary,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search products...',
+                prefixIcon: Icon(Icons.search, color: AppColors.primary),
+                filled: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: _searchProducts,
+            ),
+          ),
+          Expanded(
+            child: _filteredProducts.isEmpty
+                ? _buildEmptyState(canManageProducts)
+                : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _filteredProducts.length,
+              itemBuilder: (context, index) {
+                final product = _filteredProducts[index];
+                final controller = _cardAnimationControllers[product['id']] ??
+                    AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+                return _buildProductCard(product, controller, canManageProducts);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool canManageProducts) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.sentiment_dissatisfied, size: 80, color: AppColors.textSecondary),
+          const SizedBox(height: 16),
+          Text(
+            _products.isEmpty ? 'No products available' : 'No matching products',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 18),
+          ),
+          if (_products.isEmpty && canManageProducts) ...[
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _showAddProductDialog,
+              child: const Text('Add First Product'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+
+  Widget _buildProductCard(
+      Map<String, dynamic> product,
+      AnimationController controller,
+      bool canManageProducts, // <--- New parameter
+      ) {
+    final animation = CurvedAnimation(parent: controller, curve: Curves.easeInOut);
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.2),
+            end: Offset.zero,
+          ).animate(animation),
+          child: FadeTransition(
+            opacity: animation,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.glow.withOpacity(0.6 * animation.value),
+                    spreadRadius: 2,
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.08),
+                    spreadRadius: 1,
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    _showSnackBar('Tapped on ${product['name']}');
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  splashColor: AppColors.primary.withOpacity(0.1),
+                  highlightColor: AppColors.primary.withOpacity(0.05),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                product['name'] ?? 'N/A',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (canManageProducts) // Now using the passed parameter
+                              IconButton(
+                                icon: Icon(Icons.delete_forever_rounded, color: AppColors.danger),
+                                onPressed: () => _deleteProduct(product['id'] as int),
+                                tooltip: 'Delete Product',
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          product['description'] ?? 'No description provided.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Icon(Icons.monetization_on_rounded, size: 20, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Price: \$${(product['price'] is num ? product['price'] as num : 0.0).toStringAsFixed(2)}',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            Icon(Icons.inventory_2_rounded, size: 20, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Qty: ${(product['quantity'] is int ? product['quantity'] as int : 0).toString()}',
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDrawerTile({
+    required IconData icon,
+    required String title,
+    VoidCallback? onTap,
+    Color iconColor = AppColors.textPrimary,
+    Color textColor = AppColors.textPrimary,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(title, style: TextStyle(color: textColor, fontSize: 16)),
+      onTap: onTap,
+      hoverColor: AppColors.primary.withOpacity(0.1),
+      focusColor: AppColors.primary.withOpacity(0.15),
+    );
+  }
+}
