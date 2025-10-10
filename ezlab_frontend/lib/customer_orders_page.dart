@@ -1,102 +1,124 @@
+// lib/customer_orders_page.dart
+
 import 'package:flutter/material.dart';
- import 'package:http/http.dart' as http;
- import 'dart:convert';
- import 'package:shared_preferences/shared_preferences.dart';
- import 'package:ezlab_frontend/constants.dart';
- import 'package:photo_view/photo_view.dart';
- import 'package:url_launcher/url_launcher.dart';
- import 'package:ezlab_frontend/invoice_generator.dart';
- import 'utils/date_extensions.dart';
- import 'dart:ui';
- import 'package:flutter/foundation.dart';
- import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ezlab_frontend/constants.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:ezlab_frontend/invoice_generator.dart';
+import 'utils/date_extensions.dart';
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:ezlab_frontend/login.dart'; // Needed for navigation fallback
 
- class CustomerOrdersPage extends StatefulWidget {
-   const CustomerOrdersPage({Key? key}) : super(key: key);
+// ⭐ IMPORT THE NEW SIDEBAR COMPONENT
+import 'widgets/sidebar.dart'; 
+// (UsersPage ليس ضروريًا هنا إذا لم يكن هناك تنقل مباشر)
 
-   @override
-   State<CustomerOrdersPage> createState() => _CustomerOrdersPageState();
- }
+class CustomerOrdersPage extends StatefulWidget {
+  const CustomerOrdersPage({Key? key}) : super(key: key);
 
- class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
-   List<Map<String, dynamic>> _orders = [];
-   bool _isLoading = true;
-   String? _errorMessage;
+  @override
+  State<CustomerOrdersPage> createState() => _CustomerOrdersPageState();
+}
 
-   final List<String> _orderStatuses = [
-     'Draft',
-     'Pending',
-     'Confirmed',
-     'Shipped',
-     'Cancelled',
-   ];
+class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
+  List<Map<String, dynamic>> _orders = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+  
+  // ⭐ NEW STATE VARIABLES FOR SIDEBAR
+  String _userName = 'User'; 
+  String _userRole = ''; 
 
-   @override
-   void initState() {
-     super.initState();
-     _fetchOrders();
-   }
+  final List<String> _orderStatuses = [
+    'Draft',
+    'Pending',
+    'Confirmed',
+    'Shipped',
+    'Cancelled',
+  ];
 
-   Future<void> _fetchOrders() async {
-     setState(() {
-       _isLoading = true;
-       _errorMessage = null;
-     });
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData(); 
+    _fetchOrders();
+  }
 
-     final prefs = await SharedPreferences.getInstance();
-     final token = prefs.getString('auth_token');
+  // ⭐ Load user data and role 
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _userName = prefs.getString('username') ?? 'User';
+      _userRole = prefs.getString('role') ?? '';
+    });
+  }
 
-     if (token == null) {
-       setState(() {
-         _errorMessage = 'Authentication token not found. Please log in.';
-         _isLoading = false;
-       });
-       return;
-     }
+  Future<void> _fetchOrders() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-     try {
-       final response = await http.get(
-         Uri.parse('$baseUrl/api/orders'),
-         headers: {
-           'Authorization': 'Bearer $token',
-         },
-       );
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
 
-       if (response.statusCode == 200) {
-         final List<dynamic> rawOrders = json.decode(response.body);
-         setState(() {
-           _orders = rawOrders.map((order) {
-             return {
-               'id': order['id'],
-               'customerName': order['customerName'],
-               'companyName': order['companyName'],
-               'customerEmail': order['customerEmail'],
-               'customerPhone': order['customerPhone'],
-               'orderDate': order['orderDate'],
-               'status': order['status'],
-               'totalAmount': order['totalAmount'],
-               'items': order['items'],
-             };
-           }).toList();
-           _isLoading = false;
-         });
-       } else {
-         setState(() {
-           _errorMessage = 'Failed to fetch orders: ${response.statusCode} - ${response.body}';
-           _isLoading = false;
-         });
-         print('Failed to fetch orders: ${response.statusCode} - ${response.body}');
-       }
-     } catch (e) {
-       setState(() {
-         _errorMessage = 'Error fetching orders: $e';
-         _isLoading = false;
-       });
-       print('Error fetching orders: $e');
-     }
-   }
+    if (token == null) {
+      setState(() {
+        _errorMessage = 'Authentication token not found. Please log in.';
+        _isLoading = false;
+      });
+      return;
+    }
 
-   void _showLoadingDialog() {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/orders'),
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> rawOrders = json.decode(response.body);
+        setState(() {
+          _orders = rawOrders.map((order) {
+            return {
+              'id': order['id'],
+              'customerName': order['customerName'],
+              'companyName': order['companyName'],
+              'customerEmail': order['customerEmail'],
+              'customerPhone': order['customerPhone'],
+              'orderDate': order['orderDate'],
+              'status': order['status'],
+              'totalAmount': order['totalAmount'],
+              'items': order['items'],
+            };
+          }).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to fetch orders: ${response.statusCode} - ${response.body}';
+          _isLoading = false;
+        });
+        print('Failed to fetch orders: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Error fetching orders: $e';
+        _isLoading = false;
+      });
+      print('Error fetching orders: $e');
+    }
+  }
+
+  // --- الدوال المفقودة / الخاصة بالصفحة ---
+  void _showLoadingDialog() {
      showDialog(
        context: context,
        barrierDismissible: false,
@@ -133,7 +155,6 @@ import 'package:flutter/material.dart';
 
      final orderIndex = _orders.indexWhere((order) => order['id'] == orderId);
      if (orderIndex != -1 && _orders[_orders.indexWhere((o) => o['id'] == orderId)]['status'] == newStatus) {
-       // Close the bottom sheet if the status is the same
        if (mounted) {
          Navigator.pop(context);
          _showSnackBar('Order status is already $newStatus.');
@@ -164,8 +185,7 @@ import 'package:flutter/material.dart';
 
            try {
              final order = _orders.firstWhere((o) => o['id'] == orderId);
-
-             // This is the correct way to await the compute function
+             // Ensure compute function is correctly imported and defined elsewhere (invoice_generator.dart)
              await compute(
                generateAndSaveInvoiceCompute,
                {
@@ -177,16 +197,15 @@ import 'package:flutter/material.dart';
              _showSnackBar('Failed to generate invoice: $e', isError: true);
              print('Error generating invoice: $e');
            } finally {
-             // This closes the loading dialog
              if (mounted) {
                Navigator.pop(context);
              }
            }
          }
 
-         // This closes the bottom sheet after the whole process
          if (mounted) {
-           Navigator.pop(context);
+           // Close the status sheet if it was open
+           if(Navigator.canPop(context)) Navigator.pop(context);
          }
 
        } else {
@@ -349,15 +368,15 @@ import 'package:flutter/material.dart';
          content: Text(message, style: GoogleFonts.lato()),
          backgroundColor: isError ? AppColors.danger : AppColors.primary,
          duration: const Duration(seconds: 2),
+         behavior: SnackBarBehavior.floating,
+         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+         margin: const EdgeInsets.all(16),
        ),
      );
    }
 
    Future<void> _launchEmail(String email) async {
-     final Uri uri = Uri(
-       scheme: 'mailto',
-       path: email,
-     );
+     final Uri uri = Uri(scheme: 'mailto', path: email);
      if (await canLaunchUrl(uri)) {
        await launchUrl(uri);
      } else {
@@ -366,10 +385,7 @@ import 'package:flutter/material.dart';
    }
 
    Future<void> _launchPhone(String phone) async {
-     final Uri uri = Uri(
-       scheme: 'tel',
-       path: phone,
-     );
+     final Uri uri = Uri(scheme: 'tel', path: phone);
      if (await canLaunchUrl(uri)) {
        await launchUrl(uri);
      } else {
@@ -461,85 +477,180 @@ import 'package:flutter/material.dart';
      );
    }
 
-   @override
-   Widget build(BuildContext context) {
-     return Scaffold(
-       backgroundColor: AppColors.background,
-       appBar: AppBar(
-         title: Text(
-           'Customer Orders',
-           style: GoogleFonts.lato(
-             color: Colors.white,
-             fontWeight: FontWeight.bold,
-           ),
-         ),
-         backgroundColor: AppColors.primary.withOpacity(0.7),
-         iconTheme: const IconThemeData(color: Colors.white),
-         elevation: 0,
-         centerTitle: true,
-       ),
-       body: _isLoading
-           ? const Center(
-               child: CircularProgressIndicator(color: AppColors.primary),
-             )
-           : _errorMessage != null
-               ? Center(
-                   child: Padding(
-                     padding: const EdgeInsets.all(16.0),
-                     child: Text(
-                       _errorMessage!,
-                       textAlign: TextAlign.center,
-                       style: GoogleFonts.lato(color: AppColors.danger, fontSize: 16),
-                     ),
-                   ),
-                 )
-               : RefreshIndicator(
-                   onRefresh: _fetchOrders,
-                   color: AppColors.primary,
-                   backgroundColor: AppColors.background,
-                   child: _orders.isEmpty
-                       ? Center(
-                           child: Column(
-                             mainAxisAlignment: MainAxisAlignment.center,
-                             children: [
-                               Icon(Icons.assignment_turned_in_rounded,
-                                   size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
-                               const SizedBox(height: 16),
-                               Text(
-                                 'No customer orders found yet.',
-                                 style: GoogleFonts.lato(
-                                       color: AppColors.textSecondary,
-                                       fontSize: 20,
-                                     ),
-                               ),
-                             ],
-                           ),
+  // ⭐ دالة إضافة مستخدم (لتمريرها إلى الشريط الجانبي)
+  void _showAddUserDialog() {
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Add New User', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Re-use a basic TextFormField or define a separate widget if needed
+            TextFormField(controller: usernameController, decoration: const InputDecoration(labelText: 'Username')),
+            const SizedBox(height: 16),
+            TextFormField(controller: passwordController, decoration: const InputDecoration(labelText: 'Password')),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              // Simple API call for user registration (assuming no custom Admin role selection needed)
+              try {
+                final prefs = await SharedPreferences.getInstance();
+                final token = prefs.getString('auth_token') ?? '';
+
+                final response = await http.post(
+                  Uri.parse('$baseUrl/auth/register'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: json.encode({
+                    'username': usernameController.text,
+                    'password': passwordController.text,
+                  }),
+                );
+
+                if (response.statusCode == 200) {
+                  if(mounted) Navigator.pop(context);
+                  _showSnackBar('User added successfully');
+                } else {
+                   String errorMessage = 'Failed to add user';
+                    if (response.body.isNotEmpty) {
+                      try {
+                        final errorData = json.decode(response.body);
+                        errorMessage = errorData['message'] ?? errorMessage;
+                      } catch (_) {}
+                    }
+                  _showSnackBar(errorMessage, isError: true);
+                }
+              } catch (e) {
+                _showSnackBar('Error adding user: $e', isError: true);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Add User'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final canManageUsers = _userRole == 'admin' || _userRole == 'super_admin';
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Row(
+        children: [
+          // 1. **Sidebar (Fixed Width) - Using the Reusable Component**
+          AppSidebar(
+            activePage: 'Orders', // ⭐ Active Page
+            userName: _userName,
+            userRole: _userRole,
+            onAddUser: canManageUsers ? _showAddUserDialog : null, // Pass the dialog function
+          ),
+          
+          // 2. **Main Content (Expanded Area)**
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Header/Title
+                Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text(
+                    'Customer Orders',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+
+                // Content Area
+                Expanded(
+                   child: _isLoading
+                       ? const Center(
+                           child: CircularProgressIndicator(color: AppColors.primary),
                          )
-                       : ListView.builder(
-                           padding: const EdgeInsets.all(16.0),
-                           itemCount: _orders.length,
-                           itemBuilder: (context, index) {
-                             final order = _orders[_orders.indexOf(_orders.firstWhere((o) => o['id'] == _orders.elementAt(index)['id']))];
-                             return _buildOrderCard(order, index);
-                           },
-                         ),
+                       : _errorMessage != null
+                           ? Center(
+                               child: Padding(
+                                 padding: const EdgeInsets.all(16.0),
+                                 child: Text(
+                                   _errorMessage!,
+                                   textAlign: TextAlign.center,
+                                   style: GoogleFonts.lato(color: AppColors.danger, fontSize: 16),
+                                 ),
+                               ),
+                             )
+                           : RefreshIndicator(
+                               onRefresh: _fetchOrders,
+                               color: AppColors.primary,
+                               backgroundColor: AppColors.background,
+                               child: _orders.isEmpty
+                                   ? Center(
+                                       child: Column(
+                                         mainAxisAlignment: MainAxisAlignment.center,
+                                         children: [
+                                           Icon(Icons.assignment_turned_in_rounded,
+                                               size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
+                                           const SizedBox(height: 16),
+                                           Text(
+                                             'No customer orders found yet.',
+                                             style: GoogleFonts.lato(
+                                                   color: AppColors.textSecondary,
+                                                   fontSize: 20,
+                                                 ),
+                                           ),
+                                         ],
+                                       ),
+                                     )
+                                   : ListView.builder(
+                                       padding: const EdgeInsets.all(24.0),
+                                       itemCount: _orders.length,
+                                       itemBuilder: (context, index) {
+                                         final order = _orders[index];
+                                         return _buildOrderCard(order, index);
+                                       },
+                                     ),
+                             ),
                  ),
-     );
-   }
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
    Widget _buildOrderCard(Map<String, dynamic> order, int index) {
-     final cardColor = index.isEven ? AppColors.cardBackground : AppColors.cardAlternateBackground;
+     final cardColor = AppColors.cardBackground; // Uniform card color for better style
      final orderId = order['id'] as int;
 
      return Card(
-       margin: const EdgeInsets.only(bottom: 12),
-       elevation: 5,
+       margin: const EdgeInsets.only(bottom: 16), // Increased margin
+       elevation: 8, // Increased elevation for a richer look
        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
        color: cardColor,
        child: ExpansionTile(
+         tilePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
          title: Text(
            order['companyName'] ?? 'N/A',
-           textAlign: TextAlign.center,
+           textAlign: TextAlign.start, // Align to start for better look
            style: GoogleFonts.lato(
              fontSize: 20,
              fontWeight: FontWeight.bold,
@@ -553,18 +664,14 @@ import 'package:flutter/material.dart';
              ],
            ),
          ),
-         subtitle: Row(
-           mainAxisAlignment: MainAxisAlignment.center,
-           children: [
-             Text(
-               'Order Date: ${order['orderDate'] != null ? DateTime.parse(order['orderDate']).toLocal().toShortDateString() : 'N/A'}',
-               style: GoogleFonts.lato(color: AppColors.textSecondary),
-             ),
-           ],
-         ),
+         subtitle: Text(
+             'Order Date: ${order['orderDate'] != null ? DateTime.parse(order['orderDate']).toLocal().toShortDateString() : 'N/A'}',
+             style: GoogleFonts.lato(color: AppColors.textSecondary),
+           ),
          trailing: Row(
            mainAxisSize: MainAxisSize.min,
            children: [
+             // Status Tag & Edit Button
              GestureDetector(
                onTap: () => _showStatusSelectionSheet(orderId, order['status'] ?? _orderStatuses.first),
                child: Container(
@@ -592,12 +699,13 @@ import 'package:flutter/material.dart';
                ),
              ),
              const SizedBox(width: 8),
+             // Delete Order Button
              IconButton(
                icon: Icon(Icons.delete_sweep_rounded, color: AppColors.danger, size: 24),
                onPressed: () {
                  _confirmDeleteOrder(
                    orderId,
-                   order['customerName'] ?? 'this order',
+                   order['companyName'] ?? 'this order',
                  );
                },
                tooltip: 'Delete entire order',
@@ -606,13 +714,22 @@ import 'package:flutter/material.dart';
          ),
          children: [
            Padding(
-             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+             padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
              child: Column(
                crossAxisAlignment: CrossAxisAlignment.start,
                children: [
-                 _buildTotalTag(order['totalAmount']),
-                 const SizedBox(height: 8),
-                 _buildCustomerTag(order['customerName']),
+                 const Divider(height: 1, thickness: 1, color: AppColors.background), // Separator
+                 const SizedBox(height: 16),
+                 // Tags and Contact Info Row
+                 Wrap(
+                   spacing: 12,
+                   runSpacing: 8,
+                   children: [
+                     _buildTotalTag(order['totalAmount']),
+                     _buildCustomerTag(order['customerName']),
+                   ],
+                 ),
+                 const SizedBox(height: 12),
                  if (order['customerEmail'] != null && order['customerEmail'].isNotEmpty)
                    _buildContactLink(
                      icon: Icons.email_outlined,
@@ -647,10 +764,10 @@ import 'package:flutter/material.dart';
        return const SizedBox.shrink();
      }
      return Container(
-       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
        decoration: BoxDecoration(
          color: AppColors.customerTagBackground,
-         borderRadius: BorderRadius.circular(12),
+         borderRadius: BorderRadius.circular(15),
        ),
        child: Text(
          customerName,
@@ -668,10 +785,10 @@ import 'package:flutter/material.dart';
        return const SizedBox.shrink();
      }
      return Container(
-       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
        decoration: BoxDecoration(
-         color: AppColors.primary.withOpacity(0.7),
-         borderRadius: BorderRadius.circular(12),
+         color: AppColors.primary.withOpacity(0.9), // Darker primary for better visibility
+         borderRadius: BorderRadius.circular(15),
        ),
        child: Text(
          'Total: \$${double.tryParse(totalAmount)?.toStringAsFixed(2) ?? '0.00'}',
@@ -693,7 +810,7 @@ import 'package:flutter/material.dart';
            style: GoogleFonts.lato(
                  fontWeight: FontWeight.bold,
                  color: AppColors.textPrimary,
-                 fontSize: 14,
+                 fontSize: 16,
                ),
          ),
          const SizedBox(height: 8),
@@ -713,43 +830,51 @@ import 'package:flutter/material.dart';
        child: Row(
          mainAxisAlignment: MainAxisAlignment.spaceBetween,
          children: [
-           if (displayImageUrl != null)
-             GestureDetector(
-               onTap: () {
-                 Navigator.push(
-                   context,
-                   MaterialPageRoute(
-                     builder: (context) => ImageViewerPage(
-                       imageUrl: displayImageUrl,
-                       productName: item['name'] ?? 'Product Image',
-                     ),
-                   ),
-                 );
-               },
-               child: Padding(
-                 padding: const EdgeInsets.only(right: 8.0),
-                 child: Hero(
-                   tag: 'productImage-$orderId-${item['productId']}',
-                   child: ClipRRect(
-                     borderRadius: BorderRadius.circular(8.0),
-                     child: Image.network(
-                       displayImageUrl,
-                       width: 50,
-                       height: 50,
-                       fit: BoxFit.cover,
-                       errorBuilder: (context, error, stackTrace) {
-                         return Icon(Icons.image_not_supported, size: 50, color: AppColors.textSecondary.withOpacity(0.5));
-                       },
-                     ),
-                   ),
+           // Image/Thumbnail
+           Container(
+             width: 60,
+             height: 60,
+             decoration: BoxDecoration(
+               color: AppColors.background,
+               borderRadius: BorderRadius.circular(10),
+               boxShadow: [
+                 BoxShadow(
+                   color: Colors.black.withOpacity(0.05),
+                   blurRadius: 4,
                  ),
-               ),
-             )
-           else
-             Padding(
-               padding: const EdgeInsets.only(right: 8.0),
-               child: Icon(Icons.image_not_supported, size: 50, color: AppColors.textSecondary.withOpacity(0.5)),
+               ],
              ),
+             child: displayImageUrl != null
+                 ? GestureDetector(
+                     onTap: () {
+                       Navigator.push(
+                         context,
+                         MaterialPageRoute(
+                           builder: (context) => ImageViewerPage(
+                             imageUrl: displayImageUrl,
+                             productName: item['name'] ?? 'Product Image',
+                           ),
+                         ),
+                       );
+                     },
+                     child: Hero(
+                       tag: 'productImage-$orderId-${item['productId']}',
+                       child: ClipRRect(
+                         borderRadius: BorderRadius.circular(10),
+                         child: Image.network(
+                           displayImageUrl,
+                           fit: BoxFit.cover,
+                           errorBuilder: (context, error, stackTrace) {
+                             return Center(child: Icon(Icons.image_not_supported, size: 30, color: AppColors.textSecondary.withOpacity(0.5)));
+                           },
+                         ),
+                       ),
+                     ),
+                   )
+                 : Center(child: Icon(Icons.image_not_supported, size: 30, color: AppColors.textSecondary.withOpacity(0.5))),
+           ),
+           const SizedBox(width: 12),
+           // Product Details
            Expanded(
              child: Column(
                crossAxisAlignment: CrossAxisAlignment.start,
@@ -758,19 +883,12 @@ import 'package:flutter/material.dart';
                    '${item['name'] ?? 'Unknown Product'}',
                    style: GoogleFonts.lato(
                          color: AppColors.textPrimary,
-                         fontWeight: FontWeight.w600,
+                         fontWeight: FontWeight.bold, // Bold product name
                        ),
                    overflow: TextOverflow.ellipsis,
                  ),
                  Text(
-                   'Qty: ${int.tryParse(item['quantity']?.toString() ?? '0') ?? 0}',
-                   style: GoogleFonts.lato(
-                         color: AppColors.textSecondary,
-                         fontSize: 12,
-                       ),
-                 ),
-                 Text(
-                   'Price: \$${double.tryParse(item['priceAtOrder']?.toString() ?? '0.0')?.toStringAsFixed(2) ?? '0.00'}',
+                   'Qty: ${int.tryParse(item['quantity']?.toString() ?? '0') ?? 0} | Price: \$${double.tryParse(item['priceAtOrder']?.toString() ?? '0.0')?.toStringAsFixed(2) ?? '0.00'}',
                    style: GoogleFonts.lato(
                          color: AppColors.textSecondary,
                          fontSize: 12,
@@ -779,12 +897,13 @@ import 'package:flutter/material.dart';
                ],
              ),
            ),
+           // Delete Item Button
            IconButton(
-             icon: Icon(Icons.delete_forever_rounded, color: AppColors.danger, size: 24),
+             icon: Icon(Icons.remove_circle_outline_rounded, color: AppColors.danger, size: 24), // Cleaner delete icon
              onPressed: () {
                onDelete(orderId, item['itemId'] as int, item['name'] ?? 'this product');
              },
-             tooltip: 'Remove from order',
+             tooltip: 'Remove from order and revert stock',
            ),
          ],
        ),
@@ -794,7 +913,7 @@ import 'package:flutter/material.dart';
    Color _getStatusColor(String status) {
      switch (status) {
        case 'Confirmed':
-         return Colors.lightBlue;
+         return AppColors.success; // Use success color for confirmed
        case 'Shipped':
          return Colors.deepPurple;
        case 'Cancelled':
@@ -803,11 +922,12 @@ import 'package:flutter/material.dart';
          return Colors.grey;
        case 'Pending':
        default:
-         return AppColors.textSecondary;
+         return Colors.amber; // Brighter color for pending
      }
    }
  }
 
+ // Helper Widgets (يجب أن تكون موجودة في نفس الملف أو ملف آخر تم استيراده)
  class ImageViewerPage extends StatelessWidget {
    final String imageUrl;
    final String productName;

@@ -19,6 +19,20 @@ class _LoginPageState extends State<LoginPage> {
   String _errorMessage = '';
   final _formKey = GlobalKey<FormState>();
 
+  PageRouteBuilder _fadePageRoute(Widget targetPage) {
+  return PageRouteBuilder(
+    pageBuilder: (context, animation, secondaryAnimation) => targetPage,
+    transitionDuration: const Duration(milliseconds: 300), 
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      // استخدام FadeTransition لتطبيق تأثير التلاشي
+      return FadeTransition(
+        opacity: animation,
+        child: child,
+      );
+    },
+  );
+}
+
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -52,8 +66,9 @@ class _LoginPageState extends State<LoginPage> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (context) => ProductPage(userRole: role),
+          // ⭐ التعديل هنا: استخدام دالة التلاشي الجديدة
+          _fadePageRoute(
+            ProductPage(userRole: role),
           ),
         );
       } else {

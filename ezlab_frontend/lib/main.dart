@@ -6,7 +6,7 @@ import 'package:ezlab_frontend/product_page.dart';
 import 'package:ezlab_frontend/SplashScreen.dart'; 
 
 import 'constants.dart';
-
+ 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const CheckAuthPage(), // <-- THE APP STARTS HERE
+      home: const CheckAuthPage(), // THE APP STARTS HERE
       routes: {
         '/login': (context) => LoginPage(),
       },

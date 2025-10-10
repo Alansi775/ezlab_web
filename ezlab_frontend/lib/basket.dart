@@ -1,4 +1,3 @@
-// lib/basket.dart
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -38,6 +37,15 @@ class _BasketPageState extends State<BasketPage> {
     _fetchBasketItems();
   }
 
+  @override
+  void dispose() {
+    _customerNameController.dispose();
+    _companyNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchBasketItems() async {
     setState(() {
       _isFetchingCart = true;
@@ -72,7 +80,6 @@ class _BasketPageState extends State<BasketPage> {
                   .where((s) => s.isNotEmpty)
                   .toList();
             }
-            print('Fetched item: ${item['product_name']}, Image URLs: $imageUrlsList');
 
             return {
               'id': item['product_id'],
@@ -109,8 +116,11 @@ class _BasketPageState extends State<BasketPage> {
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(message, style: const TextStyle(color: Colors.white)),
         backgroundColor: isError ? AppColors.danger : AppColors.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -195,10 +205,23 @@ class _BasketPageState extends State<BasketPage> {
         Uri.parse('$baseUrl/api/cart/clear'),
         headers: {'Authorization': 'Bearer $token'},
       );
-      print('Cart cleared on backend after order creation.');
     } catch (e) {
       print('Error clearing cart on backend: $e');
     }
+  }
+
+  // ⭐ دالة مخصصة لتأثير الانتقال (Fade)
+  PageRouteBuilder _fadePageRoute(Widget targetPage) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => targetPage,
+      transitionDuration: const Duration(milliseconds: 300), 
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+    );
   }
 
   Future<void> _handleCheckout() async {
@@ -271,7 +294,7 @@ class _BasketPageState extends State<BasketPage> {
           }
         }
 
-        _showSnackBar('Order created successfully!');
+        _showSnackBar('Order created successfully! Redirecting to Orders List.');
         await _clearCartOnBackend();
         widget.onOrderSuccess();
         _customerNameController.clear();
@@ -279,9 +302,10 @@ class _BasketPageState extends State<BasketPage> {
         _emailController.clear();
         _phoneController.clear();
 
+        // ⭐ استخدام Fade Transition عند الانتقال إلى صفحة الطلبات
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const CustomerOrdersPage()),
+          _fadePageRoute(const CustomerOrdersPage()),
         );
 
       } else {
@@ -300,232 +324,308 @@ class _BasketPageState extends State<BasketPage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Customer Order'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+
+  // --- الدوال المساعدة للتنسيق الجديد ---
+
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      children: [
+        // زر الرجوع
+        IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back to Products',
+        ),
+        const SizedBox(width: 8),
+        Text(
+          'Create New Customer Order',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 28,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBasketItemCard(Map<String, dynamic> item) {
+    final availableStock = (item['quantity'] ?? 0);
+    final inCartQuantity = (item['cartQuantity'] ?? 0);
+    final List<String> imageUrls = (item['imageUrls'] as List<String>?) ?? [];
+    String? displayImageUrl;
+
+    if (imageUrls.isNotEmpty) {
+      final String rawImageUrl = imageUrls.first;
+      // التحقق من URL الكامل أو إضافته
+      if (rawImageUrl.startsWith('http://') || rawImageUrl.startsWith('https://')) {
+        displayImageUrl = rawImageUrl;
+      } else {
+        displayImageUrl = '$baseUrl/$rawImageUrl'; 
+      }
+    }
+
+    final bool stockWarning = inCartQuantity > availableStock;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: stockWarning ? AppColors.danger.withOpacity(0.5) : AppColors.primary.withOpacity(0.1),
+          width: 1.5,
+        ),
       ),
-      body: _isFetchingCart
-          ? Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : Column(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            child: _basketItems.isEmpty
-                ? Center(
-              child: Text(
-                'Add products to create a new customer order.',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            )
-                : ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: _basketItems.length,
-              itemBuilder: (context, index) {
-                final item = _basketItems[index];
-                final availableStock = (item['quantity'] ?? 0);
-                final inCartQuantity = (item['cartQuantity'] ?? 0);
-
-                final List<String> imageUrls = (item['imageUrls'] as List<String>?) ?? [];
-                String? displayImageUrl;
-
-                if (imageUrls.isNotEmpty) {
-                  final String rawImageUrl = imageUrls.first;
-                  if (rawImageUrl.startsWith('http://') || rawImageUrl.startsWith('https://')) {
-                    displayImageUrl = rawImageUrl;
-                  } else {
-                    displayImageUrl = '$baseUrl/$rawImageUrl';
-                  }
-                }
-
-                print('Item: ${item['name']}, Display Image URL: $displayImageUrl');
-
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  color: AppColors.cardBackground,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        if (displayImageUrl != null && displayImageUrl.isNotEmpty)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              displayImageUrl,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                print('Image load error for ${item['name']}: $error');
-                                return Container(
-                                  width: 60,
-                                  height: 60,
-                                  color: AppColors.background,
-                                  child: Icon(Icons.broken_image_rounded, color: AppColors.textSecondary),
-                                );
-                              },
-                            ),
-                          )
-                        else
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: AppColors.background,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(Icons.image_not_supported, color: AppColors.textSecondary),
-                          ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['name'] ?? 'N/A',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '\$${(item['price'] as num).toStringAsFixed(2)} per unit',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              if (inCartQuantity > availableStock)
-                                Text(
-                                  'Warning: Only $availableStock in stock!',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.danger,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.remove_circle_outline, color: AppColors.accent),
-                              onPressed: inCartQuantity > 1 && !_isLoading
-                                  ? () => _updateCartItemQuantity(item, inCartQuantity - 1)
-                                  : null,
-                            ),
-                            Text(
-                              '$inCartQuantity',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.add_circle_outline, color: AppColors.accent),
-                              onPressed: inCartQuantity < availableStock && !_isLoading
-                                  ? () => _updateCartItemQuantity(item, inCartQuantity + 1)
-                                  : null,
-                            ),
-                          ],
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_forever_rounded, color: AppColors.danger),
-                          onPressed: _isLoading ? null : () => _removeFromCart(item),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          // الصورة
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 80,
+              height: 80,
+              color: AppColors.cardBackground,
+              child: displayImageUrl != null && displayImageUrl.isNotEmpty
+                  ? Image.network(
+                      displayImageUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(child: Icon(Icons.broken_image_rounded, color: AppColors.textSecondary));
+                      },
+                    )
+                  : Center(child: Icon(Icons.image_not_supported, color: AppColors.textSecondary)),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+          const SizedBox(width: 16),
+
+          // التفاصيل
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['name'] ?? 'N/A',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Unit Price: \$${(item['price'] as num).toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                if (stockWarning)
+                  Text(
+                    'Warning: Only $availableStock in stock!',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+              ],
+            ),
+          ),
+
+          // التحكم بالكمية
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.remove_circle_outline, color: inCartQuantity > 1 ? AppColors.accent : AppColors.textSecondary.withOpacity(0.4)),
+                onPressed: inCartQuantity > 1 && !_isLoading
+                    ? () => _updateCartItemQuantity(item, inCartQuantity - 1)
+                    : null,
+              ),
+              Text(
+                '$inCartQuantity',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              IconButton(
+                icon: Icon(Icons.add_circle_outline, color: inCartQuantity < availableStock ? AppColors.accent : AppColors.textSecondary.withOpacity(0.4)),
+                onPressed: inCartQuantity < availableStock && !_isLoading
+                    ? () => _updateCartItemQuantity(item, inCartQuantity + 1)
+                    : null,
+              ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          
+          // الإجمالي الفرعي والحذف
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '\$${((item['price'] ?? 0.0) * inCartQuantity).toStringAsFixed(2)}',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              IconButton(
+                icon: Icon(Icons.delete_forever_rounded, color: AppColors.danger, size: 24),
+                onPressed: _isLoading ? null : () => _removeFromCart(item),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBasketList() {
+    if (_isFetchingCart) {
+      return Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    if (_basketItems.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.shopping_cart_outlined, size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            Text(
+              'Your Order is Empty. Add products to start.',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: ListView.builder(
+        itemCount: _basketItems.length,
+        itemBuilder: (context, index) {
+          return _buildBasketItemCard(_basketItems[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCheckoutSummary(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 1),
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Customer Details & Checkout',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Divider(height: 30, color: AppColors.background),
+              
+              // حقول النموذج
+              _buildTextField(
+                controller: _companyNameController,
+                label: 'Company Name',
+                icon: Icons.business_outlined,
+                validator: (value) => value!.isEmpty ? 'Company name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _customerNameController,
+                label: 'Contact Name',
+                icon: Icons.person_outline_rounded,
+                validator: (value) => value!.isEmpty ? 'Contact name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _emailController,
+                label: 'Email',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) => value!.isEmpty ? 'Email is required' : null,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _phoneController,
+                label: 'Phone Number',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                validator: (value) => value!.isEmpty ? 'Phone number is required' : null,
+              ),
+              const SizedBox(height: 30),
+
+              // ملخص الإجمالي وزر الدفع
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildTextField(
-                    controller: _companyNameController,
-                    label: 'Company Name',
-                    icon: Icons.business_outlined,
-                    validator: (value) => value!.isEmpty ? 'Company name is required' : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _customerNameController,
-                    label: 'Customer Name',
-                    icon: Icons.person_outline_rounded,
-                    validator: (value) => value!.isEmpty ? 'Customer name is required' : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _emailController,
-                    label: 'Customer Email',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) => value!.isEmpty ? 'Email is required' : null,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    controller: _phoneController,
-                    label: 'Customer Phone Number',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    validator: (value) => value!.isEmpty ? 'Phone number is required' : null,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Total: \$${_displayTotalPrice.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                        'Grand Total',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
                       ),
-                      ElevatedButton.icon(
-                        onPressed: _isLoading || _basketItems.isEmpty ? null : _handleCheckout,
-                        icon: _isLoading
-                            ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                            : const Icon(Icons.shopping_cart_checkout_rounded),
-                        label: Text(_isLoading ? 'Processing...' : 'Proceed Order'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          elevation: 6,
+                      Text(
+                        '\$${_displayTotalPrice.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent, // لون مميز للإجمالي
                         ),
                       ),
                     ],
                   ),
+                  ElevatedButton.icon(
+                    onPressed: _isLoading || _basketItems.isEmpty ? null : _handleCheckout,
+                    icon: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.shopping_cart_checkout_rounded, size: 28),
+                    label: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Text(_isLoading ? 'Processing...' : 'Proceed Order', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      elevation: 8,
+                    ),
+                  ),
                 ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -540,7 +640,7 @@ class _BasketPageState extends State<BasketPage> {
     return Theme(
       data: Theme.of(context).copyWith(
         textSelectionTheme: TextSelectionThemeData(
-          cursorColor: AppColors.primary,
+          cursorColor: AppColors.primary.withOpacity(0.7),
           selectionColor: AppColors.primary.withOpacity(0.3),
           selectionHandleColor: AppColors.primary,
         ),
@@ -556,17 +656,57 @@ class _BasketPageState extends State<BasketPage> {
           labelStyle: TextStyle(color: AppColors.textSecondary),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.primary, width: 2),
+            borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7), width: 2),
           ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.textSecondary),
+            borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.5)),
           ),
-          prefixIcon: Icon(icon, color: AppColors.primary),
+          prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
           floatingLabelStyle: TextStyle(
             color: AppColors.primary,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      ),
+    );
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background, // لون الخلفية العام
+      body: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. العنوان الرئيسي وزر الرجوع
+            _buildHeader(context),
+            const SizedBox(height: 30),
+
+            // 2. المحتوى الرئيسي (سلة المشتريات + نموذج العميل)
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // الجانب الأيسر: قائمة المنتجات
+                  Expanded(
+                    flex: 3,
+                    child: _buildBasketList(),
+                  ),
+                  const SizedBox(width: 40),
+
+                  // الجانب الأيمن: نموذج العميل وملخص الطلب
+                  Expanded(
+                    flex: 2,
+                    child: _buildCheckoutSummary(context),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
