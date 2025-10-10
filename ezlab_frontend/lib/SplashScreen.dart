@@ -1,4 +1,5 @@
-// lib/SplashScreen.dart
+// lib/SplashScreen.dart (الكود الكامل المُعدّل)
+
 import 'package:flutter/material.dart';
 import 'package:ezlab_frontend/login.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,32 +18,41 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _iconScaleAnimation;
   late Animation<double> _textOpacityAnimation;
   late Animation<double> _glowAnimation;
+  late Animation<double> _crmOpacityAnimation; // ⭐ جديد: لـ CRM
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000), // مدة أطول لحركة أكثر أناقة
+      duration: const Duration(milliseconds: 3000), 
     );
 
-    // حركة الأيقونة: تظهر وتكبر قليلًا
-    _iconScaleAnimation = Tween<double>(begin: 0.5, end: 1.1).animate(
+    // حركة الأيقونة: تظهر وتكبر بسلاسة (من 0.5 إلى 1.0)
+    _iconScaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0.0, 0.7, curve: Curves.elasticOut),
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
       ),
     );
 
-    // حركة النص: يظهر تدريجيًا بعد الأيقونة
+    // حركة النص (NBK): يظهر تدريجيًا بعد الأيقونة
     _textOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.4, 0.8, curve: Curves.easeIn),
+      ),
+    );
+
+    // حركة النص (CRM): يظهر متأخراً قليلاً
+    _crmOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
       ),
     );
 
-    // تأثير التوهج: يظهر تدريجيًا ويختفي
+    // تأثير التوهج: يظهر تدريجيًا ويختفي (أكثر سلاسة)
     _glowAnimation = TweenSequence<double>([
       TweenSequenceItem(tween: Tween<double>(begin: 0, end: 1), weight: 50),
       TweenSequenceItem(tween: Tween<double>(begin: 1, end: 0), weight: 50),
@@ -52,6 +62,7 @@ class _SplashScreenState extends State<SplashScreen>
         curve: const Interval(0.0, 0.8, curve: Curves.easeInOut),
       ),
     );
+
 
     _controller.forward();
 
@@ -84,10 +95,14 @@ class _SplashScreenState extends State<SplashScreen>
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
+          // استخدام تدرج لوني أكثر اتساقًا مع هوية NBK
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFE0F2F7), Color(0xFFBBC1C6)],
+            colors: [
+              Color(0xFFE0F2F7), // لون فاتح
+              Color(0xFFFFFFFF), // لون سماوي
+            ],
           ),
         ),
         child: Center(
@@ -120,33 +135,60 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         // الأيقونة نفسها
                         Icon(
-                          Icons.blur_on_rounded, // أيقونة أكثر عصرية واحترافية
+                          Icons.radar_rounded, // أيقونة احترافية
                           size: 100,
                           color: AppColors.primary,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // النص مع تأثير التلاشي
-                  Opacity(
-                    opacity: _textOpacityAnimation.value,
-                    child: Text(
-                      'EZLAB',
-                      style: GoogleFonts.montserrat(
-                        fontSize: 60,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        letterSpacing: 4,
-                        shadows: [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.2),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
+                  const SizedBox(height: 30),
+                  
+                  // ⭐ التعديل هنا: اسم الشركة NBK CRM
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // NBK
+                      Opacity(
+                        opacity: _textOpacityAnimation.value,
+                        child: Text(
+                          'NBK',
+                          style: GoogleFonts.lato(
+                            fontSize: 65,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primary,
+                            letterSpacing: 4,
+                            shadows: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.2),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                      // CRM
+                      Opacity(
+                        opacity: _crmOpacityAnimation.value,
+                        child: Text(
+                          ' CRM',
+                          style: GoogleFonts.lato(
+                            fontSize: 55, // أصغر قليلاً من NBK
+                            fontWeight: FontWeight.w300,
+                            color: AppColors.textSecondary,
+                            letterSpacing: 4,
+                            shadows: [
+                              BoxShadow(
+                                color: AppColors.textSecondary.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               );

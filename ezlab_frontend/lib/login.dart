@@ -1,10 +1,13 @@
-// lib/login.dart
+// lib/login.dart (الكود الكامل المُعدّل)
+
 import 'package:ezlab_frontend/product_page.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ezlab_frontend/constants.dart'; // Using the correct path
+// جلب GoogleFonts للاستخدام الموحد
+import 'package:google_fonts/google_fonts.dart'; 
 
 class LoginPage extends StatefulWidget {
   @override
@@ -20,18 +23,17 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
 
   PageRouteBuilder _fadePageRoute(Widget targetPage) {
-  return PageRouteBuilder(
-    pageBuilder: (context, animation, secondaryAnimation) => targetPage,
-    transitionDuration: const Duration(milliseconds: 300), 
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      // استخدام FadeTransition لتطبيق تأثير التلاشي
-      return FadeTransition(
-        opacity: animation,
-        child: child,
-      );
-    },
-  );
-}
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => targetPage,
+      transitionDuration: const Duration(milliseconds: 300), 
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+    );
+  }
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
@@ -66,7 +68,6 @@ class _LoginPageState extends State<LoginPage> {
 
         Navigator.pushReplacement(
           context,
-          // ⭐ التعديل هنا: استخدام دالة التلاشي الجديدة
           _fadePageRoute(
             ProductPage(userRole: role),
           ),
@@ -134,17 +135,27 @@ class _LoginPageState extends State<LoginPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // ⭐ التعديل هنا: استخدام تنسيق NBK CRM
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.vpn_key_rounded, size: 40, color: AppColors.primary),
                         const SizedBox(width: 12),
                         Text(
-                          'Ezlab Access',
-                          style: TextStyle(
+                          'NBK',
+                          style: GoogleFonts.lato(
                             fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w900, 
+                            color: AppColors.primary,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        Text(
+                          ' CRM',
+                          style: GoogleFonts.lato(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w300,
+                            color: AppColors.textSecondary,
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -152,7 +163,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Sign in to your account',
+                      'Sign in to your Command Center',
                       style: TextStyle(
                         fontSize: 16,
                         color: AppColors.textSecondary,
@@ -160,7 +171,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 32),
 
-                    // --- WRAP THE TEXT FIELDS IN A THEME ---
+                    // --- حقول الإدخال ---
                     Theme(
                       data: Theme.of(context).copyWith(
                         textSelectionTheme: TextSelectionThemeData(
@@ -204,7 +215,7 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                     ),
-                    // --- END WRAPPER ---
+                    // --- نهاية حقول الإدخال ---
 
                     const SizedBox(height: 24),
                     if (_errorMessage.isNotEmpty)
@@ -243,7 +254,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // Refined TextField Builder (remains unchanged as the change is in the parent widget)
+  // دالة بناء حقل النص (لم يتم تغييرها)
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -263,8 +274,6 @@ class _LoginPageState extends State<LoginPage> {
         }
       },
       style: TextStyle(fontSize: 16, color: AppColors.textPrimary),
-      // The cursorColor property here can be removed as it's now controlled by the parent Theme.
-      // But keeping it doesn't hurt. The Theme setting will take precedence.
       cursorColor: AppColors.primary.withOpacity(0.7), 
       decoration: InputDecoration(
         labelText: label,
@@ -299,7 +308,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// Animated Login Button
+// زر تسجيل الدخول المتحرك (لم يتم تغييره)
 class _LoginButton extends StatefulWidget {
   final bool isLoading;
   final VoidCallback onPressed;
@@ -367,9 +376,9 @@ class _LoginButtonState extends State<_LoginButton> with SingleTickerProviderSta
         scale: _scaleAnimation,
         child: Container(
           width: double.infinity,
-          height: 56, // Fixed height for consistency
+          height: 56, 
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16), // More rounded
+            borderRadius: BorderRadius.circular(16), 
             gradient: const LinearGradient(
               colors: [
                 AppColors.primary,
@@ -389,18 +398,18 @@ class _LoginButtonState extends State<_LoginButton> with SingleTickerProviderSta
           alignment: Alignment.center,
           child: widget.isLoading
               ? const SizedBox(
-            height: 28, // Slightly larger loader
+            height: 28, 
             width: 28,
             child: CircularProgressIndicator(
               color: Colors.white,
-              strokeWidth: 3, // Thicker stroke
+              strokeWidth: 3, 
             ),
           )
               : const Text(
             'Sign In',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 18, // Larger font
+              fontSize: 18, 
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
             ),
