@@ -11,7 +11,7 @@ const db = mysql.createConnection({
   database: 'myproject'
 });
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
+//const JWT_SECRET = process.env.JWT_SECRET || '';
 
 // Define the authenticateToken middleware function
 const authenticateToken = (req, res, next) => {
