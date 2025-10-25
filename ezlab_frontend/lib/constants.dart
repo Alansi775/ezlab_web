@@ -1,7 +1,7 @@
 // lib/utils/constants.dart
 import 'package:flutter/material.dart';
 
-const String baseUrl = 'http://192.168.1.108:5050';
+const String baseUrl = 'http://192.168.1.28:5050';
 
 class AppColors {
   static const primary = Color(0xFF1E40AF);  // A vibrant blue

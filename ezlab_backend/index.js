@@ -7,7 +7,7 @@ const cors = require('cors');
 dotenv.config();
 
 // Get IP_ADDRESS from environment variables, default to a common local IP
-const IP_ADDRESS = process.env.IP_ADDRESS || '192.168.1.108';
+const IP_ADDRESS = process.env.IP_ADDRESS || '192.168.1.28';
 
 // Initialize the Express app
 const app = express();
