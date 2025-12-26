@@ -1,4 +1,4 @@
-// productController.js
+// ezlab_backend/controllers/productController.js
 
 const db = require('../config/db');
 const multer = require('multer');
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
   }
 });
 
-// ⭐ MODIFIED: Multer upload middleware to accept multiple files (array)
+//  MODIFIED: Multer upload middleware to accept multiple files (array)
 // 'images' is the name of the field in the form data that holds the files
 // 5 is the maximum number of files that can be uploaded in one request
 const upload = multer({
@@ -42,10 +42,10 @@ const upload = multer({
     }
     cb(new Error('Only image files (JPEG, JPG, PNG, GIF, WEBP) with valid extensions are allowed!'));
   }
-}).array('images', 5); // ⭐ Changed from .single('image') to .array('images', 5)
+}).array('images', 5); //  Changed from .single('image') to .array('images', 5)
 
 module.exports = {
-  // ⭐ MODIFIED: getAllProducts to fetch multiple imageUrls from product_images table
+  //  MODIFIED: getAllProducts to fetch multiple imageUrls from product_images table
   getAllProducts: (req, res) => {
     const query = `
       SELECT
@@ -83,7 +83,7 @@ module.exports = {
     });
   },
 
-  // ⭐ MODIFIED: addProduct to handle multiple image uploads and save paths to product_images
+  //  MODIFIED: addProduct to handle multiple image uploads and save paths to product_images
   addProduct: (req, res) => {
     upload(req, res, async (err) => { // Made the callback async to use await for DB operations
       if (err instanceof multer.MulterError) {
@@ -94,7 +94,7 @@ module.exports = {
         return res.status(500).json({ message: err.message });
       }
 
-      // ⭐ Check req.files as it's an array of files now
+      //  Check req.files as it's an array of files now
       if (!req.files || req.files.length === 0) {
         return res.status(400).json({ message: 'No image files uploaded.' });
       }
@@ -187,7 +187,7 @@ module.exports = {
     });
   },
 
-  // ⭐ MODIFIED: deleteProduct to also delete associated image files from the file system
+  //  MODIFIED: deleteProduct to also delete associated image files from the file system
   deleteProduct: (req, res) => {
     const { id } = req.params;
 

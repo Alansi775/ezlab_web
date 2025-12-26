@@ -1,7 +1,9 @@
-// lib/product_detail_page.dart - الكود المصحح
+// ezlab_frontend/lib/product_detail_page.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart'; 
 import 'package:ezlab_frontend/constants.dart';
+import 'package:provider/provider.dart';
+import 'package:ezlab_frontend/providers/language_provider.dart';
 import 'widgets/sidebar.dart'; 
 
 class ProductDetailPage extends StatelessWidget {
@@ -17,10 +19,26 @@ class ProductDetailPage extends StatelessWidget {
     required this.product,
     required this.onAddToCart,
     required this.onProductUpdated,
-    // تم تمرير المتغيرات المطلوبة
+    // passing user info
     required this.loggedInUsername, 
     required this.loggedInUserRole, 
   }) : super(key: key);
+
+  // Helper function for dynamic font based on language
+  TextStyle _getTextStyle(bool isRTL, {double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) {
+    if (isRTL) {
+      return GoogleFonts.tajawal(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? AppColors.textPrimary,
+      );
+    }
+    return GoogleFonts.poppins(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? AppColors.textPrimary,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,69 +49,80 @@ class ProductDetailPage extends StatelessWidget {
         .where((s) => s.isNotEmpty)
         .toList() ?? [];
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Row(
-        children: [
-          // الشريط الجانبي (Sidebar)
-          AppSidebar(
-            activePage: 'Products', 
-            userName: loggedInUsername,
-            userRole: loggedInUserRole,
-            isDetailPage: true, 
-            onAddUser: null, // لا يوجد منطق لإضافة مستخدم هنا
-          ),
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, _) => Scaffold(
+        backgroundColor: AppColors.background,
+        body: Row(
+          children: [
+            // Sidebar with user info
+            AppSidebar(
+              activePage: 'Products', 
+              userName: loggedInUsername,
+              userRole: loggedInUserRole,
+              isDetailPage: true, 
+              onAddUser: null, 
+            ),
 
-          // منطقة المحتوى الرئيسية
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(30.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(context),
-                  const SizedBox(height: 30),
-                  _buildProductLayout(context, imageUrls, isOutOfStock),
-                ],
+            // region for the main content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(30.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context, languageProvider),
+                    const SizedBox(height: 30),
+                    _buildProductLayout(context, imageUrls, isOutOfStock, languageProvider),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
   
-  // --- الويدجت المساعدة (Helper Widgets) ---
+  // --- Helper Widgets ---
 
-  Widget _buildHeader(BuildContext context) {
-    return Column( // ⭐ تغيير من Row إلى Column لاحتواء العناصر بشكل أفضل
+  Widget _buildHeader(BuildContext context, LanguageProvider languageProvider) {
+    return Column( //  change to Column is better for layout
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row( // هذا Row سيحتوي زر الرجوع فقط
+        Row( // this row only for back button and spacing
           children: [
-            // زر الرجوع
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-              onPressed: () => Navigator.pop(context),
-              tooltip: 'Back to Products List',
+            // this is the back button
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: IconButton(
+                icon: Icon(
+                  languageProvider.isRTL 
+                    ? Icons.arrow_forward_ios_rounded 
+                    : Icons.arrow_back_ios_new_rounded, 
+                  color: AppColors.primary
+                ),
+                onPressed: () => Navigator.pop(context),
+                tooltip: languageProvider.getString('back'),
+              ),
             ),
             const SizedBox(width: 8),
-            // ⭐ إزالة العنوان من هنا
+            //  removing title from here
             const Spacer(),
           ],
         ),
         
-        // ⭐ إضافة عنوان المنتج بشكل منفصل لضمان ظهوره في سطر واحد
+        //  adding product title separately to ensure it appears in one line
         Padding(
-          padding: const EdgeInsets.only(left: 16.0, top: 8.0), // إزاحة العنوان قليلاً
+          padding: const EdgeInsets.only(left: 16.0, top: 8.0), // Slightly offset the title
           child: Text(
             product['name'] ?? 'Product Details',
-            maxLines: 1, // ⭐ تحديد سطر واحد
-            overflow: TextOverflow.ellipsis, // ⭐ إضافة علامة ... إذا لم يتسع
-            style: GoogleFonts.lato(
-              color: AppColors.textPrimary,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: _getTextStyle(
+              languageProvider.isRTL,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
-              fontSize: 22, // ⭐ تقليل حجم الخط (كان 28)
+              color: AppColors.textPrimary,
             ),
           ),
         ),
@@ -101,14 +130,14 @@ class ProductDetailPage extends StatelessWidget {
     );
 }
 
-  // (بقية الدوال المساعدة _buildProductLayout, _buildImageGallery, _buildInfoTile, _showSnackBar تبقى كما هي...)
-  Widget _buildProductLayout(BuildContext context, List<String> imageUrls, bool isOutOfStock) {
+  // this builds the main product layout with images and details
+  Widget _buildProductLayout(BuildContext context, List<String> imageUrls, bool isOutOfStock, LanguageProvider languageProvider) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
           width: 450, 
-          child: _buildImageGallery(imageUrls),
+          child: _buildImageGallery(imageUrls, languageProvider),
         ),
         const SizedBox(width: 40),
         Expanded(
@@ -117,11 +146,11 @@ class ProductDetailPage extends StatelessWidget {
             children: [
               Text(
                 product['description'] ?? 'No detailed description provided for this product.',
-                style: GoogleFonts.lato(
+                style: _getTextStyle(
+                  languageProvider.isRTL,
+                  fontSize: 16,
                   color: AppColors.textSecondary,
-                  fontSize: 18,
-                  height: 1.5,
-                ),
+                ).copyWith(height: 1.5),
               ),
               const SizedBox(height: 30),
               Row(
@@ -129,16 +158,18 @@ class ProductDetailPage extends StatelessWidget {
                 children: [
                   _buildInfoTile(
                     icon: Icons.monetization_on_rounded,
-                    label: 'Price',
+                    label: languageProvider.getString('price'),
                     value: '\$${(product['price'] is num ? product['price'] as num : 0.0).toStringAsFixed(2)}',
                     color: AppColors.accent,
+                    isRTL: languageProvider.isRTL,
                   ),
                   const SizedBox(width: 40),
                   _buildInfoTile(
                     icon: Icons.inventory_2_rounded,
-                    label: 'In Stock',
+                    label: languageProvider.getString('in_stock'),
                     value: (product['quantity'] is int ? product['quantity'] as int : 0).toString(),
                     color: isOutOfStock ? AppColors.danger : AppColors.primary,
+                    isRTL: languageProvider.isRTL,
                   ),
                 ],
               ),
@@ -148,20 +179,22 @@ class ProductDetailPage extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: isOutOfStock
                       ? () {
-                          _showSnackBar(context, 'This product is currently out of stock.', AppColors.danger);
+                          _showSnackBar(context, languageProvider.getString('out_of_stock'), AppColors.danger);
                         }
                       : () {
                           onAddToCart(product);
-                          _showSnackBar(context, 'Product "${product['name']}" added to cart.', AppColors.primary);
+                          _showSnackBar(context, '${product['name']} ' + languageProvider.getString('add_to_cart'), AppColors.primary);
                         },
                   icon: const Icon(Icons.add_shopping_cart_rounded, size: 28),
                   label: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     child: Text(
-                      isOutOfStock ? 'Out of Stock' : 'Add to Cart',
-                      style: GoogleFonts.lato(
-                        fontSize: 20,
+                      isOutOfStock ? languageProvider.getString('out_of_stock') : languageProvider.getString('add_to_cart'),
+                      style: _getTextStyle(
+                        languageProvider.isRTL,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -182,47 +215,102 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildImageGallery(List<String> imageUrls) {
+  Widget _buildImageGallery(List<String> imageUrls, LanguageProvider languageProvider) {
     if (imageUrls.isNotEmpty) {
-      return Container(
-        height: 400, 
-        decoration: BoxDecoration(
-          color: AppColors.cardBackground,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.1),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: PageView.builder(
-            itemCount: imageUrls.length,
-            itemBuilder: (context, index) {
-              final imageUrl = imageUrls[index];
-              return Padding(
-                padding: const EdgeInsets.all(8.0), 
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain, 
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: AppColors.background,
-                      child: Icon(
-                        Icons.broken_image_rounded,
-                        size: 100,
-                        color: AppColors.textSecondary.withOpacity(0.6),
+      return StatefulBuilder(
+        builder: (context, setGalleryState) {
+          final pageController = PageController();
+          
+          return ValueListenableBuilder<int>(
+            valueListenable: ValueNotifier<int>(0),
+            builder: (context, currentPage, _) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 400,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.1),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: PageView.builder(
+                          controller: pageController,
+                          onPageChanged: (int page) {
+                            setGalleryState(() {});
+                            // Rebuild after page change
+                          },
+                          itemCount: imageUrls.length,
+                          itemBuilder: (context, index) {
+                            final imageUrl = imageUrls[index];
+                            return Padding(
+                              padding: const EdgeInsets.all(8.0), 
+                              child: Image.network(
+                                imageUrl,
+                                fit: BoxFit.contain, 
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: AppColors.background,
+                                    child: Icon(
+                                      Icons.broken_image_rounded,
+                                      size: 100,
+                                      color: AppColors.textSecondary.withOpacity(0.6),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Photo indicator dots
+                  if (imageUrls.length > 1)
+                    AnimatedBuilder(
+                      animation: pageController,
+                      builder: (context, child) {
+                        final currentPage = pageController.page?.round() ?? 0;
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            imageUrls.length,
+                            (index) => GestureDetector(
+                              onTap: () => pageController.animateToPage(
+                                index,
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              ),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: currentPage == index ? 32 : 8,
+                                height: 8,
+                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                decoration: BoxDecoration(
+                                  color: currentPage == index ? AppColors.primary : AppColors.primary.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
               );
             },
-          ),
-        ),
+          );
+        },
       );
     } else {
       return Container(
@@ -242,7 +330,13 @@ class ProductDetailPage extends StatelessWidget {
               color: AppColors.primary.withOpacity(0.6),
             ),
             const SizedBox(height: 10),
-            Text('No Images Available', style: GoogleFonts.lato(color: AppColors.textSecondary)),
+            Text(
+              'No Images Available',
+              style: _getTextStyle(
+                languageProvider.isRTL,
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
         ),
       );
@@ -254,6 +348,7 @@ class ProductDetailPage extends StatelessWidget {
     required String label,
     required String value,
     required Color color,
+    required bool isRTL,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,8 +359,9 @@ class ProductDetailPage extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.lato(
-                fontSize: 16,
+              style: _getTextStyle(
+                isRTL,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
               ),
@@ -275,7 +371,8 @@ class ProductDetailPage extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           value,
-          style: GoogleFonts.lato(
+          style: _getTextStyle(
+            isRTL,
             fontSize: 28, 
             fontWeight: FontWeight.bold,
             color: color,
@@ -288,7 +385,10 @@ class ProductDetailPage extends StatelessWidget {
   void _showSnackBar(BuildContext context, String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: GoogleFonts.lato(color: Colors.white)),
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(color: Colors.white),
+        ),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

@@ -435,7 +435,7 @@ class _ProductPageState extends State<ProductPage> with TickerProviderStateMixin
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Ezlab CRM Dashboard', style: TextStyle(color: Colors.white)),
+        title: const Text('NBK CRM Dashboard', style: TextStyle(color: Colors.white)),
         backgroundColor: AppColors.primary,
         iconTheme: const IconThemeData(color: Colors.white),
       ),

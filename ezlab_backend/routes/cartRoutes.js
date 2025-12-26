@@ -1,4 +1,4 @@
-// ezlab_backend/routes/cartRoutes.js جديد
+// ezlab_backend/routes/cartRoutes.js
 const express = require('express');
 const router = express.Router();
 const cartController = require('../controllers/cartController');

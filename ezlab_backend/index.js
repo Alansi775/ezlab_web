@@ -24,7 +24,7 @@ app.use(cors({
   credentials: true
 }));
 
-// ⭐ NEW: Serve static files from the 'uploads' directory
+//  NEW: Serve static files from the 'uploads' directory
 // This makes files in 'uploads/images' (or any other subfolder of 'uploads')
 // accessible via a URL like: http://YOUR_IP:PORT/uploads/images/YOUR_IMAGE_NAME.jpg
 app.use('/uploads', express.static('uploads')); // 
@@ -67,7 +67,7 @@ app.use('/api/cart', cartRoutes);
 
 // Basic root route
 app.get('/', (req, res) => {
-  res.send('Welcome to Ezlab CRM Backend!');
+  res.send('Welcome to NBK CRM Backend!');
 });
 
 // --- Error Handling ---

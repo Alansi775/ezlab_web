@@ -12,11 +12,10 @@ import 'utils/date_extensions.dart';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:ezlab_frontend/login.dart'; // Needed for navigation fallback
-
-// ⭐ IMPORT THE NEW SIDEBAR COMPONENT
-import 'widgets/sidebar.dart'; 
-// (UsersPage ليس ضروريًا هنا إذا لم يكن هناك تنقل مباشر)
+import 'package:ezlab_frontend/login.dart';
+import 'package:provider/provider.dart';
+import 'package:ezlab_frontend/providers/language_provider.dart';
+import 'widgets/sidebar.dart';
 
 class CustomerOrdersPage extends StatefulWidget {
   const CustomerOrdersPage({Key? key}) : super(key: key);
@@ -30,7 +29,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
   bool _isLoading = true;
   String? _errorMessage;
   
-  // ⭐ NEW STATE VARIABLES FOR SIDEBAR
+  //  NEW STATE VARIABLES FOR SIDEBAR
   String _userName = 'User'; 
   String _userRole = ''; 
 
@@ -42,6 +41,22 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
     'Cancelled',
   ];
 
+  // Helper function for dynamic font based on language
+  TextStyle _getTextStyle(bool isRTL, {double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) {
+    if (isRTL) {
+      return GoogleFonts.tajawal(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? AppColors.textPrimary,
+      );
+    }
+    return GoogleFonts.poppins(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? AppColors.textPrimary,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +64,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
     _fetchOrders();
   }
 
-  // ⭐ Load user data and role 
+  //  Load user data and role 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -117,7 +132,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
     }
   }
 
-  // --- الدوال المفقودة / الخاصة بالصفحة ---
+  // --- Missing / Page-specific functions ---
   void _showLoadingDialog() {
      showDialog(
        context: context,
@@ -132,7 +147,8 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                const SizedBox(height: 20),
                Text(
                  'Generating Invoice...',
-                 style: GoogleFonts.lato(
+                 style: _getTextStyle(
+                   context.read<LanguageProvider>().isRTL,
                    color: AppColors.textPrimary,
                    fontWeight: FontWeight.bold,
                  ),
@@ -157,7 +173,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
      if (orderIndex != -1 && _orders[_orders.indexWhere((o) => o['id'] == orderId)]['status'] == newStatus) {
        if (mounted) {
          Navigator.pop(context);
-         _showSnackBar('Order status is already $newStatus.');
+         //_showSnackBar('Order status is already $newStatus.');
        }
        return;
      }
@@ -178,12 +194,12 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
              _orders[_orders.indexWhere((o) => o['id'] == orderId)]['status'] = newStatus;
            }
          });
-         _showSnackBar('Order status updated to $newStatus!');
+         //_showSnackBar('Order status updated to $newStatus!');
 
          if (newStatus == 'Confirmed') {
            _showLoadingDialog();
 
-           try {
+            try {
              final order = _orders.firstWhere((o) => o['id'] == orderId);
              // Ensure compute function is correctly imported and defined elsewhere (invoice_generator.dart)
              await compute(
@@ -191,6 +207,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                {
                  'order': order,
                  'products': List<Map<String, dynamic>>.from(order['items'] ?? []),
+                 'locale': context.read<LanguageProvider>().locale.toString(),
                },
              );
            } catch (e) {
@@ -220,7 +237,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
      }
    }
 
-   Future<void> _confirmAndDeleteOrderItem(int orderId, int itemId, String productName) async {
+   Future<void> _confirmAndDeleteOrderItem(int orderId, int itemId, String productName, LanguageProvider languageProvider) async {
      final bool? confirm = await showDialog<bool>(
        context: context,
        builder: (BuildContext context) {
@@ -229,7 +246,12 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
            title: Text(
              'Confirm Deletion',
-             style: GoogleFonts.lato(color: AppColors.textPrimary),
+             style: _getTextStyle(
+               context.read<LanguageProvider>().isRTL,
+               fontSize: 16,
+               fontWeight: FontWeight.bold,
+               color: AppColors.textPrimary,
+             ),
            ),
            content: Text(
              'Are you sure you want to remove "$productName" from this order? This will also return the quantity to stock.',
@@ -238,7 +260,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
            actions: <Widget>[
              TextButton(
                onPressed: () => Navigator.of(context).pop(false),
-               child: Text('Cancel', style: GoogleFonts.lato(color: AppColors.textPrimary)),
+               child: Text(languageProvider.getString('cancel'), style: GoogleFonts.lato(color: AppColors.textPrimary)),
              ),
              ElevatedButton(
                onPressed: () => Navigator.of(context).pop(true),
@@ -247,7 +269,14 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                  foregroundColor: Colors.white,
                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                ),
-               child: Text('Delete', style: GoogleFonts.lato()),
+               child: Text(
+                 languageProvider.getString('delete'),
+                 style: _getTextStyle(
+                   languageProvider.isRTL,
+                   fontWeight: FontWeight.bold,
+                   color: Colors.white,
+                 ),
+               ),
              ),
            ],
          );
@@ -291,7 +320,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
      }
    }
 
-   Future<void> _confirmDeleteOrder(int orderId, String customerName) async {
+   Future<void> _confirmDeleteOrder(int orderId, String customerName, LanguageProvider languageProvider) async {
      final bool? confirm = await showDialog<bool>(
        context: context,
        builder: (BuildContext context) {
@@ -309,7 +338,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
            actions: <Widget>[
              TextButton(
                onPressed: () => Navigator.of(context).pop(false),
-               child: Text('Cancel', style: GoogleFonts.lato(color: AppColors.textPrimary)),
+               child: Text(languageProvider.getString('cancel'), style: GoogleFonts.lato(color: AppColors.textPrimary)),
              ),
              ElevatedButton(
                onPressed: () => Navigator.of(context).pop(true),
@@ -318,7 +347,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                  foregroundColor: Colors.white,
                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                ),
-               child: Text('Delete Order', style: GoogleFonts.lato()),
+               child: Text(languageProvider.getString('delete_order'), style: GoogleFonts.lato()),
              ),
            ],
          );
@@ -365,7 +394,12 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
    void _showSnackBar(String message, {bool isError = false}) {
      ScaffoldMessenger.of(context).showSnackBar(
        SnackBar(
-         content: Text(message, style: GoogleFonts.lato()),
+         content: Text(
+           message,
+           style: _getTextStyle(
+             context.read<LanguageProvider>().isRTL,
+           ),
+         ),
          backgroundColor: isError ? AppColors.danger : AppColors.primary,
          duration: const Duration(seconds: 2),
          behavior: SnackBarBehavior.floating,
@@ -393,7 +427,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
      }
    }
 
-   void _showStatusSelectionSheet(int orderId, String currentStatus) {
+   void _showStatusSelectionSheet(int orderId, String currentStatus, LanguageProvider languageProvider) {
      showModalBottomSheet(
        context: context,
        backgroundColor: Colors.transparent,
@@ -413,11 +447,12 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                  mainAxisSize: MainAxisSize.min,
                  children: [
                    Text(
-                     'Update Order Status',
-                     style: GoogleFonts.lato(
+                     languageProvider.getString('update_order_status'),
+                     style: _getTextStyle(
+                       languageProvider.isRTL,
+                       fontSize: 20,
                        fontWeight: FontWeight.bold,
                        color: AppColors.textPrimary,
-                       fontSize: 20,
                      ),
                    ),
                    const SizedBox(height: 16),
@@ -433,6 +468,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                          () {
                            _updateOrderStatus(orderId, status);
                          },
+                         languageProvider,
                        );
                      }).toList(),
                    ),
@@ -445,7 +481,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
      );
    }
 
-   Widget _buildGlassmorphismStatusTag(String status, Color color, bool isSelected, VoidCallback onTap) {
+   Widget _buildGlassmorphismStatusTag(String status, Color color, bool isSelected, VoidCallback onTap, LanguageProvider languageProvider) {
      return InkWell(
        onTap: onTap,
        child: Container(
@@ -466,19 +502,20 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
            ],
          ),
          child: Text(
-           status,
-           style: GoogleFonts.lato(
-             color: isSelected ? Colors.white : color,
-             fontWeight: FontWeight.bold,
+           _getTranslatedStatus(status, languageProvider),
+           style: _getTextStyle(
+             languageProvider.isRTL,
              fontSize: 14,
+             fontWeight: FontWeight.bold,
+             color: isSelected ? Colors.white : color,
            ),
          ),
        ),
      );
    }
 
-  // ⭐ دالة إضافة مستخدم (لتمريرها إلى الشريط الجانبي)
-  void _showAddUserDialog() {
+  //  function to show add user dialog
+  void _showAddUserDialog(LanguageProvider languageProvider) {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
 
@@ -487,21 +524,49 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Add New User', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text(
+          languageProvider.getString('add_user'),
+          style: _getTextStyle(
+            languageProvider.isRTL,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Re-use a basic TextFormField or define a separate widget if needed
-            TextFormField(controller: usernameController, decoration: const InputDecoration(labelText: 'Username')),
+            TextFormField(
+              controller: usernameController,
+              style: _getTextStyle(languageProvider.isRTL, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                labelText: languageProvider.getString('username'),
+                labelStyle: _getTextStyle(languageProvider.isRTL, color: AppColors.textSecondary),
+              ),
+            ),
             const SizedBox(height: 16),
-            TextFormField(controller: passwordController, decoration: const InputDecoration(labelText: 'Password')),
+            TextFormField(
+              controller: passwordController,
+              obscureText: true,
+              style: _getTextStyle(languageProvider.isRTL, color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                labelText: languageProvider.getString('password'),
+                labelStyle: _getTextStyle(languageProvider.isRTL, color: AppColors.textSecondary),
+              ),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: Text(
+              languageProvider.getString('cancel'),
+              style: _getTextStyle(languageProvider.isRTL, color: AppColors.textSecondary),
+            ),
+          ),
           ElevatedButton(
             onPressed: () async {
-              // Simple API call for user registration (assuming no custom Admin role selection needed)
               try {
                 final prefs = await SharedPreferences.getInstance();
                 final token = prefs.getString('auth_token') ?? '';
@@ -540,7 +605,14 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Add User'),
+            child: Text(
+              languageProvider.getString('add_user_button'),
+              style: _getTextStyle(
+                languageProvider.isRTL,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -551,80 +623,89 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
   Widget build(BuildContext context) {
     final canManageUsers = _userRole == 'admin' || _userRole == 'super_admin';
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Row(
-        children: [
-          // 1. **Sidebar (Fixed Width) - Using the Reusable Component**
-          AppSidebar(
-            activePage: 'Orders', // ⭐ Active Page
-            userName: _userName,
-            userRole: _userRole,
-            onAddUser: canManageUsers ? _showAddUserDialog : null, // Pass the dialog function
-          ),
-          
-          // 2. **Main Content (Expanded Area)**
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Header/Title
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Text(
-                    'Customer Orders',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.bold,
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, _) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: Row(
+            children: [
+              // 1. **Sidebar (Fixed Width) - Using the Reusable Component**
+              AppSidebar(
+                activePage: 'Orders',
+                userName: _userName,
+                userRole: _userRole,
+                onAddUser: canManageUsers ? () => _showAddUserDialog(languageProvider) : null,
+              ),
+              
+              // 2. **Main Content (Expanded Area)**
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Header/Title
+                    Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Text(
+                        languageProvider.getString('customer_orders'),
+                        style: _getTextStyle(
+                          languageProvider.isRTL,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                // Content Area
-                Expanded(
-                   child: _isLoading
-                       ? const Center(
-                           child: CircularProgressIndicator(color: AppColors.primary),
-                         )
-                       : _errorMessage != null
-                           ? Center(
-                               child: Padding(
-                                 padding: const EdgeInsets.all(16.0),
-                                 child: Text(
-                                   _errorMessage!,
-                                   textAlign: TextAlign.center,
-                                   style: GoogleFonts.lato(color: AppColors.danger, fontSize: 16),
-                                 ),
-                               ),
+                    // Content Area
+                    Expanded(
+                       child: _isLoading
+                           ? const Center(
+                               child: CircularProgressIndicator(color: AppColors.primary),
                              )
-                           : RefreshIndicator(
-                               onRefresh: _fetchOrders,
-                               color: AppColors.primary,
-                               backgroundColor: AppColors.background,
-                               child: _orders.isEmpty
-                                   ? Center(
-                                       child: Column(
-                                         mainAxisAlignment: MainAxisAlignment.center,
-                                         children: [
-                                           Icon(Icons.assignment_turned_in_rounded,
-                                               size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
-                                           const SizedBox(height: 16),
-                                           Text(
-                                             'No customer orders found yet.',
-                                             style: GoogleFonts.lato(
-                                                   color: AppColors.textSecondary,
-                                                   fontSize: 20,
-                                                 ),
-                                           ),
-                                         ],
+                           : _errorMessage != null
+                               ? Center(
+                                   child: Padding(
+                                     padding: const EdgeInsets.all(16.0),
+                                     child: Text(
+                                       _errorMessage!,
+                                       textAlign: TextAlign.center,
+                                       style: _getTextStyle(
+                                         languageProvider.isRTL,
+                                         fontSize: 16,
+                                         color: AppColors.danger,
                                        ),
+                                     ),
+                                   ),
+                                 )
+                               : RefreshIndicator(
+                                   onRefresh: _fetchOrders,
+                                   color: AppColors.primary,
+                                   backgroundColor: AppColors.background,
+                                   child: _orders.isEmpty
+                                       ? Center(
+                                           child: Column(
+                                             mainAxisAlignment: MainAxisAlignment.center,
+                                             children: [
+                                               Icon(Icons.assignment_turned_in_rounded,
+                                                   size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
+                                               const SizedBox(height: 16),
+                                               Text(
+                                                 languageProvider.getString('no_products'),
+                                                 style: _getTextStyle(
+                                                   languageProvider.isRTL,
+                                                   fontSize: 18,
+                                                   color: AppColors.textSecondary,
+                                                 ),
+                                               ),
+                                             ],
+                                           ),
                                      )
                                    : ListView.builder(
                                        padding: const EdgeInsets.all(24.0),
                                        itemCount: _orders.length,
                                        itemBuilder: (context, index) {
                                          final order = _orders[index];
-                                         return _buildOrderCard(order, index);
+                                         return _buildOrderCard(order, index, languageProvider);
                                        },
                                      ),
                              ),
@@ -634,10 +715,12 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
-   Widget _buildOrderCard(Map<String, dynamic> order, int index) {
+   Widget _buildOrderCard(Map<String, dynamic> order, int index, LanguageProvider languageProvider) {
      final cardColor = AppColors.cardBackground; // Uniform card color for better style
      final orderId = order['id'] as int;
 
@@ -650,30 +733,27 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
          tilePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
          title: Text(
            order['companyName'] ?? 'N/A',
-           textAlign: TextAlign.start, // Align to start for better look
-           style: GoogleFonts.lato(
-             fontSize: 20,
+           textAlign: TextAlign.start,
+           style: _getTextStyle(
+             languageProvider.isRTL,
+             fontSize: 18,
              fontWeight: FontWeight.bold,
              color: AppColors.textPrimary,
-             shadows: [
-               Shadow(
-                 blurRadius: 2.0,
-                 color: Colors.black.withOpacity(0.1),
-                 offset: const Offset(1.0, 1.0),
-               ),
-             ],
            ),
          ),
          subtitle: Text(
-             'Order Date: ${order['orderDate'] != null ? DateTime.parse(order['orderDate']).toLocal().toShortDateString() : 'N/A'}',
-             style: GoogleFonts.lato(color: AppColors.textSecondary),
+           '${languageProvider.getString('order_date_label')} ${order['orderDate'] != null ? DateTime.parse(order['orderDate']).toLocal().toShortDateString() : 'N/A'}',
+           style: _getTextStyle(
+             languageProvider.isRTL,
+             color: AppColors.textSecondary,
            ),
+         ),
          trailing: Row(
            mainAxisSize: MainAxisSize.min,
            children: [
              // Status Tag & Edit Button
              GestureDetector(
-               onTap: () => _showStatusSelectionSheet(orderId, order['status'] ?? _orderStatuses.first),
+               onTap: () => _showStatusSelectionSheet(orderId, order['status'] ?? _orderStatuses.first, languageProvider),
                child: Container(
                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                  decoration: BoxDecoration(
@@ -685,11 +765,12 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                    mainAxisSize: MainAxisSize.min,
                    children: [
                      Text(
-                       order['status'] ?? _orderStatuses.first,
-                       style: GoogleFonts.lato(
-                         color: _getStatusColor(order['status'] ?? _orderStatuses.first),
-                         fontWeight: FontWeight.bold,
+                       _getTranslatedStatus(order['status'] ?? _orderStatuses.first, languageProvider),
+                       style: _getTextStyle(
+                         languageProvider.isRTL,
                          fontSize: 14,
+                         fontWeight: FontWeight.bold,
+                         color: _getStatusColor(order['status'] ?? _orderStatuses.first),
                        ),
                      ),
                      const SizedBox(width: 4),
@@ -706,6 +787,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                  _confirmDeleteOrder(
                    orderId,
                    order['companyName'] ?? 'this order',
+                   languageProvider,
                  );
                },
                tooltip: 'Delete entire order',
@@ -725,7 +807,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                    spacing: 12,
                    runSpacing: 8,
                    children: [
-                     _buildTotalTag(order['totalAmount']),
+                     _buildTotalTag(order['totalAmount'], languageProvider),
                      _buildCustomerTag(order['customerName']),
                    ],
                  ),
@@ -744,11 +826,11 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                    ),
                  const Divider(height: 24, thickness: 1),
                  if (order['items'] != null && order['items'].isNotEmpty)
-                   _buildProductList(order, order['items'])
+                   _buildProductList(order, order['items'], languageProvider)
                  else
                    Text(
-                     'No products found for this order.',
-                     style: GoogleFonts.lato(color: AppColors.textSecondary),
+                     languageProvider.getString('no_products'),
+                     style: _getTextStyle(languageProvider.isRTL, color: AppColors.textSecondary),
                    ),
                  const SizedBox(height: 12),
                ],
@@ -771,16 +853,17 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
        ),
        child: Text(
          customerName,
-         style: GoogleFonts.lato(
-           color: AppColors.customerTagText,
-           fontWeight: FontWeight.bold,
+         style: _getTextStyle(
+           context.read<LanguageProvider>().isRTL,
            fontSize: 12,
+           fontWeight: FontWeight.bold,
+           color: AppColors.customerTagText,
          ),
        ),
      );
    }
 
-   Widget _buildTotalTag(String? totalAmount) {
+   Widget _buildTotalTag(String? totalAmount, LanguageProvider languageProvider) {
      if (totalAmount == null) {
        return const SizedBox.shrink();
      }
@@ -791,31 +874,33 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
          borderRadius: BorderRadius.circular(15),
        ),
        child: Text(
-         'Total: \$${double.tryParse(totalAmount)?.toStringAsFixed(2) ?? '0.00'}',
-         style: GoogleFonts.lato(
-           color: Colors.white,
-           fontWeight: FontWeight.bold,
+         '${languageProvider.getString('total_label')} \$${double.tryParse(totalAmount)?.toStringAsFixed(2) ?? '0.00'}',
+         style: _getTextStyle(
+           languageProvider.isRTL,
            fontSize: 12,
+           fontWeight: FontWeight.bold,
+           color: Colors.white,
          ),
        ),
      );
    }
 
-   Widget _buildProductList(Map<String, dynamic> order, List items) {
+   Widget _buildProductList(Map<String, dynamic> order, List items, LanguageProvider languageProvider) {
      return Column(
        crossAxisAlignment: CrossAxisAlignment.start,
        children: [
          Text(
-           'Products:',
-           style: GoogleFonts.lato(
-                 fontWeight: FontWeight.bold,
-                 color: AppColors.textPrimary,
-                 fontSize: 16,
-               ),
+           languageProvider.getString('products'),
+           style: _getTextStyle(
+             languageProvider.isRTL,
+             fontSize: 16,
+             fontWeight: FontWeight.bold,
+             color: AppColors.textPrimary,
+           ),
          ),
          const SizedBox(height: 8),
          ...items.map((item) => _buildProductItem(context, order['id'] as int, item, (orderId, itemId, name) {
-               _confirmAndDeleteOrderItem(orderId, itemId, name);
+               _confirmAndDeleteOrderItem(orderId, itemId, name, languageProvider);
              })).toList(),
        ],
      );
@@ -881,18 +966,20 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                children: [
                  Text(
                    '${item['name'] ?? 'Unknown Product'}',
-                   style: GoogleFonts.lato(
-                         color: AppColors.textPrimary,
-                         fontWeight: FontWeight.bold, // Bold product name
-                       ),
+                   style: _getTextStyle(
+                     context.read<LanguageProvider>().isRTL,
+                     fontWeight: FontWeight.bold,
+                     color: AppColors.textPrimary,
+                   ),
                    overflow: TextOverflow.ellipsis,
                  ),
                  Text(
                    'Qty: ${int.tryParse(item['quantity']?.toString() ?? '0') ?? 0} | Price: \$${double.tryParse(item['priceAtOrder']?.toString() ?? '0.0')?.toStringAsFixed(2) ?? '0.00'}',
-                   style: GoogleFonts.lato(
-                         color: AppColors.textSecondary,
-                         fontSize: 12,
-                       ),
+                   style: _getTextStyle(
+                     context.read<LanguageProvider>().isRTL,
+                     fontSize: 12,
+                     color: AppColors.textSecondary,
+                   ),
                  ),
                ],
              ),
@@ -925,9 +1012,26 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
          return Colors.amber; // Brighter color for pending
      }
    }
+
+   String _getTranslatedStatus(String status, LanguageProvider languageProvider) {
+     switch (status) {
+       case 'Draft':
+         return languageProvider.getString('draft');
+       case 'Pending':
+         return languageProvider.getString('pending');
+       case 'Confirmed':
+         return languageProvider.getString('confirmed');
+       case 'Shipped':
+         return languageProvider.getString('shipped');
+       case 'Cancelled':
+         return languageProvider.getString('cancelled');
+       default:
+         return status;
+     }
+   }
  }
 
- // Helper Widgets (يجب أن تكون موجودة في نفس الملف أو ملف آخر تم استيراده)
+ // Helper Widgets
  class ImageViewerPage extends StatelessWidget {
    final String imageUrl;
    final String productName;
@@ -940,7 +1044,11 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
        appBar: AppBar(
          title: Text(
            productName,
-           style: GoogleFonts.lato(color: Colors.white),
+           style: GoogleFonts.poppins(
+             color: Colors.white,
+             fontSize: 16,
+             fontWeight: FontWeight.bold,
+           ),
          ),
          backgroundColor: AppColors.primary,
          iconTheme: const IconThemeData(color: Colors.white),
@@ -974,7 +1082,10 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                      const SizedBox(height: 10),
                      Text(
                        'Failed to load image',
-                       style: GoogleFonts.lato(color: AppColors.textSecondary, fontSize: 16),
+                       style: GoogleFonts.poppins(
+                         color: AppColors.textSecondary,
+                         fontSize: 16,
+                       ),
                      ),
                    ],
                  ),
@@ -998,7 +1109,7 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
            const SizedBox(width: 8),
            Text(
              text,
-             style: GoogleFonts.lato(
+             style: GoogleFonts.poppins(
                color: AppColors.primary,
                decoration: TextDecoration.underline,
              ),

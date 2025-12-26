@@ -1,3 +1,5 @@
+// ezlab_backend/routes/orderRoutes.js
+
 const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
@@ -24,7 +26,7 @@ router.put('/:orderId/items/:itemId', orderController.updateOrderItemQuantity); 
 // Remove item from an order
 router.delete('/:orderId/items/:itemId', orderController.removeItemFromOrder); // DELETE /api/orders/:orderId/items/:itemId
 
-// ⭐ ADD THIS ROUTE FOR DELETING THE WHOLE ORDER ⭐
+//  ADD THIS ROUTE FOR DELETING THE WHOLE ORDER 
 router.delete('/:orderId', orderController.deleteOrder); // DELETE /api/orders/:orderId
 
 // Update the status of an order using PATCH

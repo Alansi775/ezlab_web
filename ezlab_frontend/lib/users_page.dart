@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart'; 
+import 'package:provider/provider.dart';
+import 'package:ezlab_frontend/providers/language_provider.dart';
 // تأكد من وجود ملف constants.dart في الجذر
 import 'package:ezlab_frontend/constants.dart'; 
 import 'widgets/sidebar.dart'; 
@@ -30,6 +32,22 @@ class _UsersPageState extends State<UsersPage> {
   final Color _cardColor = AppColors.cardBackground;
   final Color _switchActiveColor = AppColors.primaryDark;
   final Color _switchInactiveColor = AppColors.textSecondary.withOpacity(0.5);
+
+  // Helper function for dynamic font based on language
+  TextStyle _getTextStyle(bool isRTL, {double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) {
+    if (isRTL) {
+      return GoogleFonts.tajawal(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? AppColors.textPrimary,
+      );
+    }
+    return GoogleFonts.poppins(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? AppColors.textPrimary,
+    );
+  }
 
   @override
   void initState() {
@@ -161,7 +179,7 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Future<void> _deleteUser(String userId, String usernameToDelete) async {
+  Future<void> _deleteUser(String userId, String usernameToDelete, LanguageProvider languageProvider) async {
     if (usernameToDelete == _SUPER_ADMIN_USERNAME) {
       _showSnackBar('Cannot delete the Super Admin user.', isError: true);
       return;
@@ -173,12 +191,32 @@ class _UsersPageState extends State<UsersPage> {
         return AlertDialog(
           backgroundColor: _cardColor,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Confirm Deletion', style: GoogleFonts.lato(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-          content: Text('Are you sure you want to delete user $usernameToDelete?', style: GoogleFonts.lato(color: AppColors.textSecondary)),
+          title: Text(
+            languageProvider.getString('confirm_deletion'),
+            style: _getTextStyle(
+              languageProvider.isRTL,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          content: Text(
+            languageProvider.getString('confirm_user_deletion').replaceAll('{username}', usernameToDelete),
+            style: _getTextStyle(
+              languageProvider.isRTL,
+              color: AppColors.textSecondary,
+            ),
+          ),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: GoogleFonts.lato(color: AppColors.textPrimary)),
+              child: Text(
+                languageProvider.getString('cancel'),
+                style: _getTextStyle(
+                  languageProvider.isRTL,
+                  color: AppColors.textPrimary,
+                ),
+              ),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -186,7 +224,14 @@ class _UsersPageState extends State<UsersPage> {
                 backgroundColor: AppColors.danger,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Delete', style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+              child: Text(
+                languageProvider.getString('delete'),
+                style: _getTextStyle(
+                  languageProvider.isRTL,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ],
         );
@@ -219,7 +264,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   // مربع حوار إضافة مستخدم جديد (الدور الافتراضي هو 'user')
-  void _showAddUserDialog() {
+  void _showAddUserDialog(LanguageProvider languageProvider) {
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
 
@@ -228,28 +273,49 @@ class _UsersPageState extends State<UsersPage> {
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Add New User', style: GoogleFonts.lato(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text(
+          languageProvider.getString('add_user'),
+          style: _getTextStyle(
+            languageProvider.isRTL,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.textPrimary,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildTextField(controller: usernameController, label: 'Username'),
+            _buildTextField(controller: usernameController, label: languageProvider.getString('username'), isRTL: languageProvider.isRTL),
             const SizedBox(height: 16),
-            _buildTextField(controller: passwordController, label: 'Password'),
+            _buildTextField(controller: passwordController, label: languageProvider.getString('password'), isRTL: languageProvider.isRTL),
             const SizedBox(height: 16),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary), child: Text('Cancel', style: GoogleFonts.lato())),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+            child: Text(
+              languageProvider.getString('cancel'),
+              style: _getTextStyle(languageProvider.isRTL),
+            ),
+          ),
           ElevatedButton(
-            // تعيين الدور بشكل ثابت إلى 'user'
             onPressed: () => _handleRegisterUser(usernameController.text, passwordController.text, 'user'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: Text('Add User', style: GoogleFonts.lato(fontWeight: FontWeight.bold)),
+            child: Text(
+              languageProvider.getString('add_user_button'),
+              style: _getTextStyle(
+                languageProvider.isRTL,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -302,6 +368,7 @@ class _UsersPageState extends State<UsersPage> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
+    required bool isRTL,
   }) {
     // نستخدم Theme لتطبيق لون التظليل بشكل صحيح لـ TextFormField داخل الـ Dialog
     return Theme(
@@ -317,7 +384,7 @@ class _UsersPageState extends State<UsersPage> {
         cursorColor: AppColors.primary, // لون المؤشر
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: GoogleFonts.lato(color: AppColors.textSecondary),
+          labelStyle: _getTextStyle(isRTL, color: AppColors.textSecondary),
           filled: true,
           fillColor: AppColors.background,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -325,16 +392,17 @@ class _UsersPageState extends State<UsersPage> {
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primary, width: 2)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
-        style: GoogleFonts.lato(color: AppColors.textPrimary),
+        style: _getTextStyle(isRTL, color: AppColors.textPrimary),
       ),
     );
   }
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (mounted) {
+      final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message, style: GoogleFonts.lato(color: Colors.white)),
+          content: Text(message, style: _getTextStyle(languageProvider.isRTL, color: Colors.white)),
           backgroundColor: isError ? AppColors.danger : AppColors.primary,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
@@ -347,80 +415,84 @@ class _UsersPageState extends State<UsersPage> {
 
 
   @override
+  @override
   Widget build(BuildContext context) {
     final bool canManageUsers = _loggedInUserRole == 'admin' || _loggedInUserRole == 'super_admin';
     
-    if (!canManageUsers && !_isLoading) {
-      return const Scaffold(
-        backgroundColor: AppColors.background,
-        body: Center(
-          child: Text(
-            'ACCESS DENIED: You do not have the required permissions to manage users.',
-            style: TextStyle(color: AppColors.danger, fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-        ),
-      );
-    }
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, _) {
+        if (!canManageUsers && !_isLoading) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: Center(
+              child: Text(
+                languageProvider.getString('access_denied'),
+                style: const TextStyle(color: AppColors.danger, fontSize: 18),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
 
-    final List<dynamic> filteredUsers = _getFilteredUsers();
-    final List<dynamic> adminUsers = filteredUsers.where((u) => u['role'] == 'admin' || u['role'] == 'super_admin').toList();
-    final List<dynamic> regularUsers = filteredUsers.where((u) => u['role'] == 'user').toList();
+        final List<dynamic> filteredUsers = _getFilteredUsers();
+        final List<dynamic> adminUsers = filteredUsers.where((u) => u['role'] == 'admin' || u['role'] == 'super_admin').toList();
+        final List<dynamic> regularUsers = filteredUsers.where((u) => u['role'] == 'user').toList();
 
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      body: Row(
-        children: [
-          // 1. الشريط الجانبي (Sidebar)
-          AppSidebar(
-            activePage: 'Users',
-            userName: _loggedInUsername,
-            userRole: _loggedInUserRole,
-            onAddUser: canManageUsers ? _showAddUserDialog : null,
-          ),
+        return Scaffold(
+          backgroundColor: _backgroundColor,
+          body: Row(
+            children: [
+              // 1. الشريط الجانبي (Sidebar)
+              AppSidebar(
+                activePage: 'Users',
+                userName: _loggedInUsername,
+                userRole: _loggedInUserRole,
+                onAddUser: canManageUsers ? () => _showAddUserDialog(languageProvider) : null,
+              ),
 
-          // 2. منطقة المحتوى الرئيسية
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // الرأس وشريط البحث
-                Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Manage System Users',
-                          style: GoogleFonts.lato(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 32,
-                          ),
-                        ),
-                      ),
-                      // حقل البحث (Search Bar) - تم تضمينه في ويدجت Theme لتطبيق ألوان التظليل
-                      SizedBox(
-                        width: 300, 
-                        child: Theme(
-                          data: Theme.of(context).copyWith(
-                            textSelectionTheme: TextSelectionThemeData(
-                              cursorColor: AppColors.primary,
-                              selectionColor: AppColors.primary.withOpacity(0.3), // لون التظليل
-                              selectionHandleColor: AppColors.primary, // لون مقابض التحديد
+              // 2. منطقة المحتوى الرئيسية
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // الرأس وشريط البحث
+                    Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              languageProvider.getString('manage_users'),
+                              style: _getTextStyle(
+                                languageProvider.isRTL,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
-                          child: TextFormField(
-                            // لون المؤشر
-                            cursorColor: AppColors.primary, 
-                            onChanged: (value) {
-                              setState(() {
-                                _searchQuery = value;
+                          // حقل البحث (Search Bar) - تم تضمينه في ويدجت Theme لتطبيق ألوان التظليل
+                          SizedBox(
+                            width: 300, 
+                            child: Theme(
+                              data: Theme.of(context).copyWith(
+                                textSelectionTheme: TextSelectionThemeData(
+                                  cursorColor: AppColors.primary,
+                                  selectionColor: AppColors.primary.withOpacity(0.3), // لون التظليل
+                                  selectionHandleColor: AppColors.primary, // لون مقابض التحديد
+                                ),
+                              ),
+                              child: TextFormField(
+                                // لون المؤشر
+                                cursorColor: AppColors.primary, 
+                                onChanged: (value) {
+                                  setState(() {
+                                    _searchQuery = value;
                               });
                             },
                             decoration: InputDecoration(
-                              hintText: 'Search by username...',
-                              hintStyle: GoogleFonts.lato(color: AppColors.textSecondary.withOpacity(0.7)),
+                              hintText: languageProvider.getString('search_username'),
+                              hintStyle: _getTextStyle(languageProvider.isRTL, color: AppColors.textSecondary.withOpacity(0.7)),
                               prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                               filled: true,
                               fillColor: AppColors.cardBackground,
@@ -439,7 +511,7 @@ class _UsersPageState extends State<UsersPage> {
                               ),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             ),
-                            style: GoogleFonts.lato(color: AppColors.textPrimary),
+                            style: _getTextStyle(languageProvider.isRTL, color: AppColors.textPrimary),
                           ),
                         ),
                       ),
@@ -464,10 +536,11 @@ class _UsersPageState extends State<UsersPage> {
                           const SizedBox(height: 16),
                           Text(
                             _searchQuery.isNotEmpty ? 'No users found matching "$_searchQuery".' : 'No users found.',
-                            style: GoogleFonts.lato(
+                            style: _getTextStyle(
+                              languageProvider.isRTL,
                               fontSize: 18,
-                              color: AppColors.textSecondary,
                               fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                           if (_searchQuery.isNotEmpty)
@@ -477,27 +550,95 @@ class _UsersPageState extends State<UsersPage> {
                                   _searchQuery = '';
                                 });
                               },
-                              child: Text('Show all users', style: GoogleFonts.lato(color: AppColors.primary)),
+                              child: Text('Show all users', style: _getTextStyle(languageProvider.isRTL, color: AppColors.primary)),
                             ),
                         ],
                       ),
                     )
-                        : ListView(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                        : Column(
                       children: [
                         // --- قسم المدراء (Admins & Super Admins) ---
                         if (adminUsers.isNotEmpty) ...[
-                          _buildSectionHeader('System Administrators (${adminUsers.length})', Icons.security_rounded, AppColors.accent),
-                          const SizedBox(height: 12),
-                          ...adminUsers.map((user) => _buildUserCard(user, isCurrent: user['username'] == _loggedInUsername)).toList(),
-                          const SizedBox(height: 30),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            child: _buildSectionHeader('${languageProvider.getString('system_administrators')} (${adminUsers.length})', Icons.security_rounded, AppColors.accent, languageProvider.isRTL),
+                          ),
+                          Expanded(
+                            child: GridView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                mainAxisSpacing: 10,
+                                crossAxisSpacing: 10,
+                                childAspectRatio: 1.1,
+                              ),
+                              itemCount: adminUsers.length,
+                              itemBuilder: (context, index) {
+                                return _buildUserCard(
+                                  adminUsers[index],
+                                  isCurrent: adminUsers[index]['username'] == _loggedInUsername,
+                                  languageProvider: languageProvider,
+                                );
+                              },
+                            ),
+                          ),
+                        ] else if (regularUsers.isEmpty) ...[
+                          Expanded(
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.person_search_rounded, size: 80, color: AppColors.textSecondary.withOpacity(0.5)),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _searchQuery.isNotEmpty ? 'No users found matching "$_searchQuery".' : 'No users found.',
+                                    style: _getTextStyle(
+                                      languageProvider.isRTL,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  if (_searchQuery.isNotEmpty)
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _searchQuery = '';
+                                        });
+                                      },
+                                      child: Text('Show all users', style: _getTextStyle(languageProvider.isRTL, color: AppColors.primary)),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                         
                         // --- قسم المستخدمين العاديين (Regular Users) ---
                         if (regularUsers.isNotEmpty) ...[
-                          _buildSectionHeader('Regular Users (${regularUsers.length})', Icons.group_rounded, AppColors.primary),
-                          const SizedBox(height: 12),
-                          ...regularUsers.map((user) => _buildUserCard(user, isCurrent: user['username'] == _loggedInUsername)).toList(),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            child: _buildSectionHeader('${languageProvider.getString('regular_users')} (${regularUsers.length})', Icons.group_rounded, AppColors.primary, languageProvider.isRTL),
+                          ),
+                          Expanded(
+                            child: GridView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                mainAxisSpacing: 10,
+                                crossAxisSpacing: 10,
+                                childAspectRatio: 1.1,
+                              ),
+                              itemCount: regularUsers.length,
+                              itemBuilder: (context, index) {
+                                return _buildUserCard(
+                                  regularUsers[index],
+                                  isCurrent: regularUsers[index]['username'] == _loggedInUsername,
+                                  languageProvider: languageProvider,
+                                );
+                              },
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -508,11 +649,13 @@ class _UsersPageState extends State<UsersPage> {
           ),
         ],
       ),
+        );
+      },
     );
   }
 
   // ويدجت عنوان القسم
-  Widget _buildSectionHeader(String title, IconData icon, Color color) {
+  Widget _buildSectionHeader(String title, IconData icon, Color color, bool isRTL) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0, top: 16.0), 
       child: Row(
@@ -521,10 +664,11 @@ class _UsersPageState extends State<UsersPage> {
           const SizedBox(width: 8),
           Text(
             title,
-            style: GoogleFonts.lato(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
+            style: _getTextStyle(
+              isRTL,
               fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
             ),
           ),
           const Expanded(
@@ -539,7 +683,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   // ويدجت بطاقة المستخدم
-  Widget _buildUserCard(Map<String, dynamic> user, {required bool isCurrent}) {
+  Widget _buildUserCard(Map<String, dynamic> user, {required bool isCurrent, required LanguageProvider languageProvider}) {
     final String currentUsername = user['username'] ?? '';
     final String currentRole = user['role'] ?? 'user';
     final String userId = user['id'].toString();
@@ -554,142 +698,147 @@ class _UsersPageState extends State<UsersPage> {
     return Card(
       // تظليل المستخدم الحالي
       color: isCurrent ? AppColors.primary.withOpacity(0.1) : _cardColor, 
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: EdgeInsets.zero,
       elevation: 5,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         side: isSuperAdmin ? const BorderSide(color: AppColors.accent, width: 2) : (isCurrent ? const BorderSide(color: AppColors.primary, width: 2) : BorderSide.none),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(6),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // Avatar + Delete Button
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 CircleAvatar(
-                  radius: 24,
+                  radius: 17,
                   backgroundColor: isSuperAdmin ? AppColors.accent : (currentRole == 'admin' ? AppColors.primary : AppColors.textSecondary.withOpacity(0.7)),
                   child: Text(
                     currentUsername.isNotEmpty ? currentUsername[0].toUpperCase() : 'U',
-                    style: GoogleFonts.lato(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    style: _getTextStyle(languageProvider.isRTL, fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        currentUsername,
-                        style: GoogleFonts.lato(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 20,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Text(
-                            isSuperAdmin ? 'SUPER ADMIN' : currentRole.toUpperCase(),
-                            style: GoogleFonts.lato(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              color: isSuperAdmin ? AppColors.accent : (currentRole == 'admin' ? AppColors.primary : AppColors.textSecondary),
-                            ),
-                          ),
-                          if (isCurrent) ...[
-                            const SizedBox(width: 8),
-                            Text(' (You)', style: GoogleFonts.lato(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
-                          ]
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                const Spacer(),
                 if (canDeleteThisUser)
-                  IconButton(
-                    icon: const Icon(Icons.delete_forever_rounded, color: AppColors.danger, size: 28),
-                    onPressed: () => _deleteUser(userId, currentUsername),
-                    tooltip: 'Delete User',
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.delete_forever_rounded, color: AppColors.danger, size: 16),
+                      onPressed: () => _deleteUser(userId, currentUsername, languageProvider),
+                      tooltip: 'Delete User',
+                    ),
                   ),
                 if (isSuperAdmin)
-                   Tooltip(
+                  Tooltip(
                     message: 'Cannot modify or delete the Super Admin.',
-                    child: Icon(Icons.lock_rounded, color: AppColors.accent, size: 24),
+                    child: Icon(Icons.lock_rounded, color: AppColors.accent, size: 16),
                   ),
               ],
             ),
-            const Divider(height: 30, thickness: 1, color: AppColors.background),
+            const SizedBox(height: 5),
             
-            // عناصر التحكم (Controls)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSwitchControl(
-                  label: 'Admin Privileges',
-                  value: currentRole == 'admin' || currentRole == 'super_admin',
-                  onChanged: canModifyThisUser && !isSuperAdmin 
-                      ? (v) => _updateUserRole(userId, v)
-                      : null, 
-                  isSuperAdmin: isSuperAdmin,
-                ),
-                _buildSwitchControl(
-                  label: 'Account Active',
-                  value: user['isActive'] == 1,
-                  onChanged: canModifyThisUser && !isSuperAdmin
-                      ? (v) => _updateUserStatus(userId, v)
-                      : null, 
-                  isSuperAdmin: isSuperAdmin,
-                ),
-              ],
+            // Username
+            Text(
+              currentUsername,
+              style: _getTextStyle(languageProvider.isRTL, fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
+            
+            // Role
+            Text(
+              isSuperAdmin ? 'SUPER ADMIN' : currentRole.toUpperCase(),
+              style: _getTextStyle(
+                languageProvider.isRTL,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isSuperAdmin ? AppColors.accent : (currentRole == 'admin' ? AppColors.primary : AppColors.textSecondary),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            
+            // You Tag
+            if (isCurrent)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '(You)',
+                  style: _getTextStyle(
+                    languageProvider.isRTL,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 5),
+            Divider(height: 0.3, thickness: 0.2, color: AppColors.textSecondary.withOpacity(0.2)),
+            const SizedBox(height: 5),
+            
+            // Controls - Compact Version
+            if (!isSuperAdmin)
+              Column(
+                children: [
+                  _buildSwitchControlCompact(
+                    label: languageProvider.getString('admin_privileges'),
+                    value: currentRole == 'admin' || currentRole == 'super_admin',
+                    onChanged: canModifyThisUser ? (v) => _updateUserRole(userId, v) : null,
+                  ),
+                  const SizedBox(height: 3),
+                  _buildSwitchControlCompact(
+                    label: languageProvider.getString('account_active'),
+                    value: user['isActive'] == 1,
+                    onChanged: canModifyThisUser ? (v) => _updateUserStatus(userId, v) : null,
+                  ),
+                ],
+              ),
           ],
         ),
       ),
     );
   }
 
-  // ويدجت مفتاح التبديل (Switch Control)
-  Widget _buildSwitchControl({
+  // ويدجت مفتاح التبديل الصغيرة (Compact Switch Control) - للـ Grid
+  Widget _buildSwitchControlCompact({
     required String label,
     required bool value,
     required Function(bool)? onChanged,
-    bool isSuperAdmin = false,
   }) {
     final bool isDisabled = onChanged == null;
 
-    return Expanded(
-      child: Tooltip(
-        message: isDisabled ? (isSuperAdmin ? 'Cannot modify Super Admin' : 'Cannot modify your own account') : label,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: GoogleFonts.lato(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Transform.scale(
-              scale: 0.9,
-              child: Switch(
-                value: value,
-                onChanged: onChanged,
-                activeColor: _switchActiveColor,
-                activeTrackColor: _switchActiveColor.withOpacity(0.4),
-                inactiveThumbColor: isDisabled ? Colors.grey[400] : _switchInactiveColor,
-                inactiveTrackColor: isDisabled ? Colors.grey[200] : _switchInactiveColor.withOpacity(0.4),
-                thumbIcon: isDisabled 
-                  ? MaterialStateProperty.all(const Icon(Icons.lock, size: 16, color: Colors.white)) 
-                  : null,
-              ),
-            ),
-          ],
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: _getTextStyle(true, fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-      ),
+        Transform.scale(
+          scale: 0.8,
+          child: Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: _switchActiveColor,
+            activeTrackColor: _switchActiveColor.withOpacity(0.4),
+            inactiveThumbColor: isDisabled ? Colors.grey[400] : _switchInactiveColor,
+            inactiveTrackColor: isDisabled ? Colors.grey[200] : _switchInactiveColor.withOpacity(0.4),
+            thumbIcon: isDisabled 
+              ? MaterialStateProperty.all(const Icon(Icons.lock, size: 10, color: Colors.white)) 
+              : null,
+          ),
+        ),
+      ],
     );
   }
 }

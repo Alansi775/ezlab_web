@@ -4,8 +4,8 @@ const mysql = require('mysql2');
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'Alansi77',
-  password: 'Alansi77@',
-  database: 'myproject'
+  password: 'root',
+  database: 'ezlab_database'
 }); 
 
 const username = 'Admin';

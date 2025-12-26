@@ -1,7 +1,7 @@
 const db = require('../config/db');
 
-// Define the Super Admin username (MAKE SURE THIS USER EXISTS IN YOUR DB!)
-const SUPER_ADMIN_USERNAME = 'superadmin_ezlab'; // <--- IMPORTANT: Change this to your actual super admin's username
+// Define the Super Admin username 
+const SUPER_ADMIN_USERNAME = 'superadmin_ezlab'; 
 
 module.exports = {
   getUsers: (req, res) => {
@@ -61,7 +61,7 @@ module.exports = {
           return res.status(403).json({ message: 'Cannot block the Super Admin user.' });
         }
         // If someone tries to activate Super Admin (value = 1), it's fine, but effectively no-op as they are always active.
-        // We can just let it proceed or add a message. For now, let it proceed to avoid over-complication.
+        // We can just let it proceed or add a message. For now, let it proceed to avoid over complication.
       }
 
       // Proceed with status update if not Super Admin or if trying to activate Super Admin
@@ -92,10 +92,10 @@ module.exports = {
 
       if (userRows[0].username === SUPER_ADMIN_USERNAME) {
         // Super Admin's role cannot be changed
-        if (value !== 'super_admin') { // Only allow changing to 'super_admin' if it somehow got changed, effectively a no-op
+        if (value !== 'super_admin') { // Only allow changing to 'super_admin' if it somehow got changed, effectively a no op
           return res.status(403).json({ message: 'Cannot change the role of the Super Admin user.' });
         }
-        // If value is 'super_admin', just acknowledge, effectively no-op
+        // If value is 'super_admin', just acknowledge, effectively no op
         return res.status(200).json({ message: 'Super Admin role cannot be changed.' });
       }
 

@@ -1,3 +1,4 @@
+// ezlab_backend/controllers/orderController.js
 const db = require('../config/db');
 
 module.exports = {
@@ -152,7 +153,7 @@ module.exports = {
         o.company_name,
         o.customer_email,
         o.customer_phone,
-        o.order_date,
+        o.createdAt AS order_date,
         o.status,
         o.total_amount,
         o.notes,
@@ -214,7 +215,7 @@ module.exports = {
         o.company_name AS companyName,
         o.customer_email AS customerEmail,
         o.customer_phone AS customerPhone,
-        o.order_date AS orderDate,
+        o.createdAt AS orderDate,
         o.status,
         o.total_amount AS totalAmount,
         GROUP_CONCAT(
@@ -232,8 +233,8 @@ module.exports = {
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN products p ON oi.product_id = p.id
-      GROUP BY o.id, o.customer_name, o.company_name, o.customer_email, o.customer_phone, o.order_date, o.status, o.total_amount
-      ORDER BY o.order_date DESC, o.id`,
+      GROUP BY o.id
+      ORDER BY o.createdAt DESC, o.id`,
       (err, results) => {
         if (err) {
           console.error('Error fetching orders:', err);

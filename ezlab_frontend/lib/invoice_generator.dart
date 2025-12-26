@@ -1,3 +1,4 @@
+// ezlab_frontend/lib/invoice_generator.dart
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
@@ -28,14 +29,79 @@ Future<Uint8List> _fetchImage(String url) async {
   }
 }
 
+Map<String, String> _localizedLabels(String languageCode) {
+  switch (languageCode) {
+    case 'ar':
+      return {
+        'title': 'فاتورة / إيصال',
+        'orderId': 'رقم الطلب',
+        'date': 'التاريخ',
+        'customerInfo': 'معلومات العميل',
+        'company': 'الشركة',
+        'contactPerson': 'اسم المندوب',
+        'email': 'البريد الإلكتروني',
+        'phone': 'الهاتف',
+        'product': 'المنتج',
+        'qty': 'الكمية',
+        'price': 'السعر',
+        'total': 'الإجمالي',
+        'totalAmount': 'المبلغ الإجمالي',
+        'companyName': 'ايزلاب',
+        'officialSeal': 'الختم الرسمي',
+        'thankYou': 'شكراً لتعاملكم معنا!',
+        'preparedBy': 'إعداد: فريق NBK TECHNOLOJY',
+      };
+    case 'tr':
+      return {
+        'title': 'Fatura / Makbuz',
+        'orderId': 'Sipariş No',
+        'date': 'Tarih',
+        'customerInfo': 'Müşteri Bilgileri',
+        'company': 'Şirket',
+        'contactPerson': 'İlgili Kişi',
+        'email': 'E-posta',
+        'phone': 'Telefon',
+        'product': 'Ürün',
+        'qty': 'Adet',
+        'price': 'Fiyat',
+        'total': 'Toplam',
+        'totalAmount': 'Toplam Tutar',
+        'companyName': 'NBK TECHNOLOJY',
+        'officialSeal': 'Resmi Mühür',
+        'thankYou': 'İşiniz için teşekkürler!',
+        'preparedBy': 'Hazırlayan: NBK TECHNOLOJY Ekibi',
+      };
+    default:
+      return {
+        'title': 'Invoice / Receipt',
+        'orderId': 'Order ID',
+        'date': 'Date',
+        'customerInfo': 'Customer Information',
+        'company': 'Company',
+        'contactPerson': 'Contact Person',
+        'email': 'Email',
+        'phone': 'Phone',
+        'product': 'Product',
+        'qty': 'Qty',
+        'price': 'Price',
+        'total': 'Total',
+        'totalAmount': 'Total Amount',
+        'companyName': 'NBK TECHNOLOJY',
+        'officialSeal': 'Official Seal',
+        'thankYou': 'Thank you for your business!',
+        'preparedBy': 'Prepared by NBK TECHNOLOJY Team',
+      };
+  }
+}
+
 Future<pw.Font> _loadFont(String path) async {
   final fontData = await rootBundle.load(path);
   return pw.Font.ttf(fontData);
 }
 
-String _formatNumber(double number) {
+String _formatNumber(double number, String locale) {
   final formatter = NumberFormat.currency(
-    locale: 'en_US',
+    locale: locale,
     symbol: '',
     decimalDigits: 2,
   );
@@ -46,15 +112,29 @@ String _formatNumber(double number) {
 Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
   final order = data['order'] as Map<String, dynamic>;
   final products = data['products'] as List<Map<String, dynamic>>;
+  final locale = (data['locale'] as String?) ?? 'en_US';
+  final languageCode = locale.split(RegExp('[_-]'))[0];
+  final isRtl = languageCode == 'ar' || languageCode == 'fa' || languageCode == 'he';
 
   final pdf = pw.Document();
 
   final ByteData logoBytes = await rootBundle.load('lib/assets/images/ezlab.jpeg');
   final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
 
-  final regularFont = await _loadFont('lib/assets/fonts/Tajawal-Regular.ttf');
-  final boldFont = await _loadFont('lib/assets/fonts/Tajawal-Bold.ttf');
-  final fallbackFont = await _loadFont('lib/assets/fonts/Roboto-Regular.ttf');
+  // Choose fonts depending on locale; Tajawal works well for Arabic, Roboto for Latin
+  final tajawalRegular = await _loadFont('lib/assets/fonts/Tajawal-Regular.ttf');
+  final tajawalBold = await _loadFont('lib/assets/fonts/Tajawal-Bold.ttf');
+  final robotoRegular = await _loadFont('lib/assets/fonts/Roboto-Regular.ttf');
+  final robotoBold = robotoRegular; // no separate bold included here
+
+  pw.Font primaryFont = robotoRegular;
+  pw.Font primaryBold = robotoBold;
+  pw.Font fallbackFont = tajawalRegular;
+  if (isRtl) {
+    primaryFont = tajawalRegular;
+    primaryBold = tajawalBold;
+    fallbackFont = robotoRegular;
+  }
 
   print('Products data received: $products');
 
@@ -71,26 +151,29 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
       if (imageData.isNotEmpty) {
         productImg = pw.Image(pw.MemoryImage(imageData), width: 50, height: 50);
       } else {
-        productImg = pw.Text('No Image', style: pw.TextStyle(font: regularFont, fontSize: 8));
+        productImg = pw.Text('No Image', style: pw.TextStyle(font: primaryFont, fontSize: 8, fontFallback: [fallbackFont]));
       }
     }
     
-    final formattedPrice = '\$${_formatNumber(price)}';
-    final formattedTotal = '\$${_formatNumber(total)}';
+    final formattedPrice = '\$${_formatNumber(price, locale)}';
+    final formattedTotal = '\$${_formatNumber(total, locale)}';
 
     return [
-      pw.Text(item['name'] ?? 'N/A', style: pw.TextStyle(font: regularFont, fontFallback: [fallbackFont])),
+      pw.Text(item['name'] ?? 'N/A', style: pw.TextStyle(font: primaryFont, fontFallback: [fallbackFont])),
       pw.Center(child: productImg),
-      pw.Text(quantity.toString(), style: pw.TextStyle(font: regularFont, fontFallback: [fallbackFont]), textAlign: pw.TextAlign.center),
-      pw.Text(formattedPrice, style: pw.TextStyle(font: regularFont, fontFallback: [fallbackFont]), textAlign: pw.TextAlign.right),
-      pw.Text(formattedTotal, style: pw.TextStyle(font: regularFont, fontFallback: [fallbackFont]), textAlign: pw.TextAlign.right),
+      pw.Text(quantity.toString(), style: pw.TextStyle(font: primaryFont, fontFallback: [fallbackFont]), textAlign: pw.TextAlign.center),
+      pw.Text(formattedPrice, style: pw.TextStyle(font: primaryFont, fontFallback: [fallbackFont]), textAlign: pw.TextAlign.right),
+      pw.Text(formattedTotal, style: pw.TextStyle(font: primaryFont, fontFallback: [fallbackFont]), textAlign: pw.TextAlign.right),
     ];
   }));
+
+  // localized labels
+  final labels = _localizedLabels(languageCode);
 
   pdf.addPage(
     pw.Page(
       pageFormat: PdfPageFormat.a4,
-      textDirection: pw.TextDirection.ltr,
+      textDirection: isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr,
       build: (pw.Context context) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -102,9 +185,9 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      'Invoice / Receipt',
+                      labels['title']!,
                       style: pw.TextStyle(
-                        font: boldFont,
+                        font: primaryBold,
                         fontSize: 24,
                         fontWeight: pw.FontWeight.bold,
                         color: PdfColors.blueGrey800,
@@ -112,9 +195,9 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
                       ),
                     ),
                     pw.SizedBox(height: 8),
-                    pw.Text('Order ID: ${order['id']}', style: pw.TextStyle(font: regularFont, fontSize: 12, color: PdfColors.grey700, fontFallback: [fallbackFont])),
-                    pw.Text('Date: ${DateTime.parse(order['orderDate']).toLocal().toShortDateString()}',
-                        style: pw.TextStyle(font: regularFont, fontSize: 12, color: PdfColors.grey700, fontFallback: [fallbackFont])),
+                    pw.Text('${labels['orderId']}: ${order['id']}', style: pw.TextStyle(font: primaryFont, fontSize: 12, color: PdfColors.grey700, fontFallback: [fallbackFont])),
+                    pw.Text('${labels['date']}: ${DateFormat.yMd(locale).format(DateTime.parse(order['orderDate']).toLocal())}',
+                        style: pw.TextStyle(font: primaryFont, fontSize: 12, color: PdfColors.grey700, fontFallback: [fallbackFont])),
                   ],
                 ),
                 pw.Image(logoImage, height: 40),
@@ -124,9 +207,9 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
             pw.Divider(color: PdfColors.grey500),
             pw.SizedBox(height: 20),
             pw.Text(
-              'Customer Information:',
+              labels['customerInfo']!,
               style: pw.TextStyle(
-                font: boldFont,
+                font: primaryBold,
                 fontSize: 16,
                 fontWeight: pw.FontWeight.bold,
                 color: PdfColors.blueGrey800,
@@ -137,27 +220,37 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('Company: ${order['companyName'] ?? 'N/A'}', style: pw.TextStyle(font: regularFont, fontSize: 12, fontFallback: [fallbackFont])),
-                pw.Text('Contact Person: ${order['customerName'] ?? 'N/A'}', style: pw.TextStyle(font: regularFont, fontSize: 12, fontFallback: [fallbackFont])),
-                pw.Text('Email: ${order['customerEmail'] ?? 'N/A'}', style: pw.TextStyle(font: regularFont, fontSize: 12, fontFallback: [fallbackFont])),
-                pw.Text('Phone: ${order['customerPhone'] ?? 'N/A'}', style: pw.TextStyle(font: regularFont, fontSize: 12, fontFallback: [fallbackFont])),
+                pw.Text('${labels['company']}: ${order['companyName'] ?? 'N/A'}', style: pw.TextStyle(font: primaryFont, fontSize: 12, fontFallback: [fallbackFont])),
+                pw.Text('${labels['contactPerson']}: ${order['customerName'] ?? 'N/A'}', style: pw.TextStyle(font: primaryFont, fontSize: 12, fontFallback: [fallbackFont])),
+                pw.Text('${labels['email']}: ${order['customerEmail'] ?? 'N/A'}', style: pw.TextStyle(font: primaryFont, fontSize: 12, fontFallback: [fallbackFont])),
+                pw.Text('${labels['phone']}: ${order['customerPhone'] ?? 'N/A'}', style: pw.TextStyle(font: primaryFont, fontSize: 12, fontFallback: [fallbackFont])),
               ],
             ),
             pw.SizedBox(height: 20),
             pw.Table.fromTextArray(
-              headerStyle: pw.TextStyle(font: boldFont, fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.white, fontFallback: [fallbackFont]),
+              headerStyle: pw.TextStyle(font: primaryBold, fontWeight: pw.FontWeight.bold, fontSize: 12, color: PdfColors.white, fontFallback: [fallbackFont]),
               headerDecoration: pw.BoxDecoration(color: PdfColors.blueGrey800),
-              cellStyle: pw.TextStyle(font: regularFont, fontSize: 10, fontFallback: [fallbackFont]),
+              cellStyle: pw.TextStyle(font: primaryFont, fontSize: 10, fontFallback: [fallbackFont]),
               cellAlignment: pw.Alignment.centerLeft,
-              columnWidths: {
-                0: const pw.FlexColumnWidth(3),
-                1: const pw.FlexColumnWidth(1),
-                2: const pw.FlexColumnWidth(1),
-                3: const pw.FlexColumnWidth(1.5),
-                4: const pw.FlexColumnWidth(1.5),
-              },
-              headers: ['Product', '', 'Qty', 'Price', 'Total'],
-              data: tableData,
+              columnWidths: isRtl
+                  ? {
+                      4: const pw.FlexColumnWidth(3),
+                      3: const pw.FlexColumnWidth(1),
+                      2: const pw.FlexColumnWidth(1),
+                      1: const pw.FlexColumnWidth(1.5),
+                      0: const pw.FlexColumnWidth(1.5),
+                    }
+                  : {
+                      0: const pw.FlexColumnWidth(3),
+                      1: const pw.FlexColumnWidth(1),
+                      2: const pw.FlexColumnWidth(1),
+                      3: const pw.FlexColumnWidth(1.5),
+                      4: const pw.FlexColumnWidth(1.5),
+                    },
+              headers: isRtl ? [labels['total']!, labels['price']!, labels['qty']!, '', labels['product']!] : [labels['product']!, '', labels['qty']!, labels['price']!, labels['total']!],
+              data: isRtl
+                  ? tableData.map((row) => row.reversed.toList()).toList()
+                  : tableData,
             ),
             pw.SizedBox(height: 20),
             pw.Divider(color: PdfColors.grey500),
@@ -165,9 +258,9 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
               mainAxisAlignment: pw.MainAxisAlignment.end,
               children: [
                 pw.Text(
-                  'Total Amount: \$${_formatNumber(double.tryParse(order['totalAmount']?.toString() ?? '0.0') ?? 0.0)}',
+                  '${labels['totalAmount']}: \$${_formatNumber(double.tryParse(order['totalAmount']?.toString() ?? '0.0') ?? 0.0, locale)}',
                   style: pw.TextStyle(
-                    font: boldFont,
+                    font: primaryBold,
                     fontSize: 16,
                     fontWeight: pw.FontWeight.bold,
                     color: PdfColors.blueGrey800,
@@ -183,16 +276,16 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('EZLAB', style: pw.TextStyle(font: boldFont, fontSize: 18, fontFallback: [fallbackFont])),
-                    pw.Text('Official Seal', style: pw.TextStyle(font: regularFont, fontSize: 10, fontFallback: [fallbackFont])),
+                    pw.Text(labels['companyName'] ?? 'EZLAB', style: pw.TextStyle(font: primaryBold, fontSize: 18, fontFallback: [fallbackFont])),
+                    pw.Text(labels['officialSeal']!, style: pw.TextStyle(font: primaryFont, fontSize: 10, fontFallback: [fallbackFont])),
                     pw.SizedBox(height: 5),
-                    pw.Text('Date: ${DateTime.now().toLocal().toShortDateString()}', style: pw.TextStyle(font: regularFont, fontSize: 8, fontFallback: [fallbackFont])),
+                    pw.Text('${labels['date']}: ${DateFormat.yMd(locale).format(DateTime.now().toLocal())}', style: pw.TextStyle(font: primaryFont, fontSize: 8, fontFallback: [fallbackFont])),
                   ],
                 ),
                 pw.Text(
-                  'Thank you for your business!',
+                  labels['thankYou']!,
                   style: pw.TextStyle(
-                    font: regularFont,
+                    font: primaryFont,
                     fontSize: 14,
                     fontStyle: pw.FontStyle.italic,
                     color: PdfColors.grey700,
@@ -204,7 +297,7 @@ Future<void> generateAndSaveInvoiceCompute(Map<String, dynamic> data) async {
             pw.SizedBox(height: 30),
             pw.Divider(color: PdfColors.grey500),
             pw.SizedBox(height: 10),
-            pw.Text('Prepared by EZLAB Team', style: pw.TextStyle(font: regularFont, fontSize: 10, color: PdfColors.grey500, fontFallback: [fallbackFont])),
+            pw.Text(labels['preparedBy']!, style: pw.TextStyle(font: primaryFont, fontSize: 10, color: PdfColors.grey500, fontFallback: [fallbackFont])),
           ],
         );
       },

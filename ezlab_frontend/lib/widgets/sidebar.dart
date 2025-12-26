@@ -1,4 +1,4 @@
-// lib/widgets/sidebar.dart
+// ezlab_frontend/lib/widgets/sidebar.dart
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,14 +9,15 @@ import '../product_page.dart';
 import '../customer_orders_page.dart';
 import '../users_page.dart';
 import '../login.dart';
-
-// ⚠️ (ملاحظة: يجب التأكد من وجود دالة _showAddUserDialog في صفحة UsersPage أو إنشاءها في مكان مركزي إذا لزم الأمر.)
+import '../language_settings_page.dart';
+import 'package:provider/provider.dart';
+import '../providers/language_provider.dart';
 
 class AppSidebar extends StatefulWidget {
   final String activePage;
   final String userName;
   final String userRole;
-  final VoidCallback? onAddUser; // لـ Add User dialog
+  final VoidCallback? onAddUser; // For Add User dialog
   final bool isDetailPage;
 
   const AppSidebar({
@@ -37,10 +38,10 @@ class _AppSidebarState extends State<AppSidebar> {
   PageRouteBuilder _fadePageRoute(Widget targetPage) {
   return PageRouteBuilder(
     pageBuilder: (context, animation, secondaryAnimation) => targetPage,
-    // مدة قصيرة للانتقال (مثل 300 مللي ثانية)
+    // Short duration for transition (e.g., 150 milliseconds)
     transitionDuration: const Duration(milliseconds: 150), 
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      // استخدام FadeTransition لتطبيق تأثير التلاشي
+      // Use FadeTransition to apply fade effect
       return FadeTransition(
         opacity: animation,
         child: child,
@@ -49,8 +50,24 @@ class _AppSidebarState extends State<AppSidebar> {
   );
 }
 
+  // Function to get the appropriate font style based on language direction
+  TextStyle _getTextStyle(bool isRTL, {double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) {
+    if (isRTL) {
+      return GoogleFonts.tajawal(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? AppColors.textPrimary,
+      );
+    }
+    return GoogleFonts.poppins(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? AppColors.textPrimary,
+    );
+  }
 
-  // 1. الدالة المساعدة لبناء كل عنصر في الشريط الجانبي
+
+  // 1. Helper function to build each item in the sidebar
   Widget _buildSidebarTile({
     required IconData icon,
     required String title,
@@ -76,12 +93,17 @@ class _AppSidebarState extends State<AppSidebar> {
                 size: 20,
               ),
               const SizedBox(width: 12),
-              Text(
-                title,
-                style: GoogleFonts.lato(
-                  color: isActive ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                  fontSize: 14,
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _getTextStyle(
+                    context.read<LanguageProvider>().isRTL,
+                    fontSize: 14,
+                    fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                    color: isActive ? AppColors.primary : AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
@@ -91,7 +113,7 @@ class _AppSidebarState extends State<AppSidebar> {
     );
   }
 
-  // 2. دالة تسجيل الخروج
+  // 2. Logout function
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
@@ -108,7 +130,7 @@ class _AppSidebarState extends State<AppSidebar> {
 
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        _fadePageRoute(LoginPage()), // استدعاء الدالة الجديدة
+        _fadePageRoute(LoginPage()),
             (Route<dynamic> route) => false,
       );
     }
@@ -132,7 +154,7 @@ class _AppSidebarState extends State<AppSidebar> {
       ),
       child: Column(
         children: [
-          // 3. ✨ NEW: Logo Area
+          // 3. NEW: Logo Area
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             child: Row(
@@ -151,7 +173,7 @@ class _AppSidebarState extends State<AppSidebar> {
           ),
           const Divider(height: 1, color: AppColors.background),
 
-          // 4. ✨ NEW: User Profile Section
+          // 4. NEW: User Profile Section
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
             child: Column(
@@ -160,19 +182,19 @@ class _AppSidebarState extends State<AppSidebar> {
                   radius: 30,
                   backgroundColor: AppColors.primary.withOpacity(0.8),
                   child: Text(
-                    // ⭐ التحصين الأول: استخدام 'U' كقيمة افتراضية بدلاً من محاولة الوصول إلى الحرف الأول من سلسلة فارغة أو null
+                    // First safeguard: Use 'U' as a default value instead of trying to access the first character of an empty or null string
                     widget.userName.isNotEmpty ? widget.userName[0].toUpperCase() : 'U', 
                     style: GoogleFonts.lato(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  // ⭐ التحصين الثاني: استخدام 'Guest' إذا كانت القيمة فارغة
+                  // Second safeguard: Use 'Guest' if the value is empty
                   widget.userName.isNotEmpty ? widget.userName : 'Guest', 
                   style: GoogleFonts.lato(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
-                  // ⭐ التحصين الثالث: استخدام 'USER' إذا كانت القيمة فارغة
+                  // Third safeguard: Use 'USER' if the value is empty
                   (widget.userRole.isNotEmpty ? widget.userRole : 'user').toUpperCase(), 
                   style: GoogleFonts.lato(color: AppColors.textSecondary, fontSize: 12),
                 ),
@@ -189,13 +211,11 @@ class _AppSidebarState extends State<AppSidebar> {
                 // Dashboard / Products (Active in ProductPage)
                 _buildSidebarTile(
                   icon: Icons.inventory_2_rounded,
-                  title: 'Products',
+                  title: context.read<LanguageProvider>().getString('products'),
                   onTap: () {
                     if (widget.activePage == 'Products' && widget.isDetailPage) {
-                      // إذا كنا في صفحة تفاصيل المنتج، نعود للخلف (pop)
                       Navigator.pop(context);
                     } else if (widget.activePage != 'Products') {
-                      // إذا لم نكن في الصفحة، ننتقل إليها (pushReplacement)
                       Navigator.pushReplacement(context, _fadePageRoute(const ProductPage()));
                     }
                   },
@@ -205,7 +225,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 // Customer Orders (Using Sales Pipeline Icon)
                 _buildSidebarTile(
                   icon: Icons.receipt_long,
-                  title: 'Customer Orders',
+                  title: context.read<LanguageProvider>().getString('customer_orders'),
                   onTap: () {
                     if (widget.activePage != 'Orders') {
                       Navigator.pushReplacement(context, _fadePageRoute(const CustomerOrdersPage()));
@@ -219,12 +239,20 @@ class _AppSidebarState extends State<AppSidebar> {
                   const Divider(height: 20, color: AppColors.background, indent: 15, endIndent: 15),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                    child: Text('Admin Tools', style: GoogleFonts.lato(color: AppColors.textSecondary.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      context.read<LanguageProvider>().getString('admin_tools'),
+                      style: _getTextStyle(
+                        context.read<LanguageProvider>().isRTL,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textSecondary.withOpacity(0.6),
+                      ),
+                    ),
                   ),
                   // Manage Users Link
                   _buildSidebarTile(
                     icon: Icons.people_alt_rounded,
-                    title: 'Manage Users',
+                    title: context.read<LanguageProvider>().getString('manage_users'),
                     onTap: () {
                       if (widget.activePage != 'Users') {
                         Navigator.push(context, _fadePageRoute(const UsersPage()));
@@ -232,21 +260,43 @@ class _AppSidebarState extends State<AppSidebar> {
                     },
                     isActive: widget.activePage == 'Users',
                   ),
-                  // Add User Link (New requirement: direct link from sidebar)
+                  // Add User Link
                   if (widget.onAddUser != null)
                     _buildSidebarTile(
                       icon: Icons.person_add_alt_1_rounded,
-                      title: 'Add User',
+                      title: context.read<LanguageProvider>().getString('add_user'),
                       onTap: widget.onAddUser!,
                     ),
                 ],
+
+                // Settings (New)
+                const Divider(height: 20, color: AppColors.background, indent: 15, endIndent: 15),
+                _buildSidebarTile(
+                  icon: Icons.settings_rounded,
+                  title: context.read<LanguageProvider>().getString('settings'),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) => const LanguageSettingsPage(),
+                        transitionDuration: const Duration(milliseconds: 150),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
 
                 // Logout
                 Padding(
                   padding: const EdgeInsets.only(top: 20.0, left: 10, right: 10),
                   child: _buildSidebarTile(
                     icon: Icons.logout_rounded,
-                    title: 'Logout',
+                    title: context.read<LanguageProvider>().getString('logout'),
                     onTap: _logout,
                   ),
                 ),

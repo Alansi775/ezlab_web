@@ -1,17 +1,19 @@
 // ezlab_backend/middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2'); 
+const dotenv = require('dotenv');
+dotenv.config();
 
 // Ensure this connection matches your config/db.js if possible,
 // or just make sure it's correct for authMiddleware's specific use.
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'Alansi77',
-  password: 'Alansi77@',
-  database: 'myproject'
+  password: 'root',
+  database: 'ezlab_database'
 });
 
-//const JWT_SECRET = process.env.JWT_SECRET || '';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
 
 // Define the authenticateToken middleware function
 const authenticateToken = (req, res, next) => {

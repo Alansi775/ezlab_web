@@ -24,13 +24,13 @@ module.exports = {
             p.quantity AS product_stock, -- Current stock from products table
             ci.quantity AS cart_quantity, -- Quantity in the cart
             ci.price_at_add,
-            -- ⭐ MODIFIED: Join with product_images and GROUP_CONCAT to get all image paths
+            --  MODIFIED: Join with product_images and GROUP_CONCAT to get all image paths
             GROUP_CONCAT(pi.image_path ORDER BY pi.id ASC) AS imageUrls
            FROM cart_items ci
            JOIN products p ON ci.product_id = p.id
-           LEFT JOIN product_images pi ON p.id = pi.product_id -- ⭐ NEW JOIN
+           LEFT JOIN product_images pi ON p.id = pi.product_id --  NEW JOIN
            WHERE ci.cart_id = ?
-           GROUP BY ci.id, p.id, p.name, p.description, p.quantity, ci.quantity, ci.price_at_add`, // ⭐ NEW GROUP BY
+           GROUP BY ci.id, p.id, p.name, p.description, p.quantity, ci.quantity, ci.price_at_add`, //  NEW GROUP BY
           [cartId],
           (err, items) => {
             if (err) {
@@ -53,7 +53,7 @@ module.exports = {
                         // However, since Flutter expects relative paths to be combined with baseUrl,
                         // let's stick to sending only the relative path here unless it's full.
 
-                        // ⭐ Determine if the path is already a full URL or needs baseUrl prepended
+                        //  Determine if the path is already a full URL or needs baseUrl prepended
                         if (cleanedPath.startsWith('http://') || cleanedPath.startsWith('https://')) {
                             return cleanedPath; // It's already a full URL
                         } else {

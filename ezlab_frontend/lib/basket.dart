@@ -3,7 +3,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:ezlab_frontend/constants.dart';
+import 'package:provider/provider.dart';
+import 'package:ezlab_frontend/providers/language_provider.dart';
 import 'package:ezlab_frontend/customer_orders_page.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class BasketPage extends StatefulWidget {
   final int cartId;
@@ -30,6 +33,37 @@ class _BasketPageState extends State<BasketPage> {
   double _displayTotalPrice = 0.0;
   bool _isLoading = false;
   bool _isFetchingCart = true;
+
+  // Helper function for dynamic font based on language
+  TextStyle _getTextStyle(bool isRTL, {double fontSize = 14, FontWeight fontWeight = FontWeight.w400, Color? color}) {
+    if (isRTL) {
+      return GoogleFonts.tajawal(
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        color: color ?? AppColors.textPrimary,
+      );
+    }
+    return GoogleFonts.poppins(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color ?? AppColors.textPrimary,
+    );
+  }
+
+  // this function handles unauthorized responses
+  Future<void> _handleUnauthorized() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    await prefs.remove('role');
+    await prefs.remove('username');
+    
+    if (mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('your session has expired. Please log in again.'), backgroundColor: Colors.red,),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -66,6 +100,11 @@ class _BasketPageState extends State<BasketPage> {
           'Authorization': 'Bearer $token',
         },
       );
+
+      if (response.statusCode == 401) {
+        _handleUnauthorized();
+        return;
+      }
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseBody = json.decode(response.body);
@@ -116,7 +155,10 @@ class _BasketPageState extends State<BasketPage> {
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message, style: const TextStyle(color: Colors.white)),
+        content: Text(
+          message,
+          style: GoogleFonts.poppins(color: Colors.white),
+        ),
         backgroundColor: isError ? AppColors.danger : AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -146,6 +188,11 @@ class _BasketPageState extends State<BasketPage> {
         },
         body: json.encode({'quantity': newQuantity}),
       );
+
+      if (response.statusCode == 401) {
+        _handleUnauthorized();
+        return;
+      }
 
       if (response.statusCode == 200) {
         _showSnackBar('Item quantity updated!');
@@ -180,6 +227,11 @@ class _BasketPageState extends State<BasketPage> {
         },
       );
 
+      if (response.statusCode == 401) {
+        _handleUnauthorized();
+        return;
+      }
+
       if (response.statusCode == 200) {
         _showSnackBar('${product['name']} removed from cart!');
         await _fetchBasketItems();
@@ -210,7 +262,7 @@ class _BasketPageState extends State<BasketPage> {
     }
   }
 
-  // ⭐ دالة مخصصة لتأثير الانتقال (Fade)
+  //  special fade transition for navigation
   PageRouteBuilder _fadePageRoute(Widget targetPage) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => targetPage,
@@ -302,7 +354,7 @@ class _BasketPageState extends State<BasketPage> {
         _emailController.clear();
         _phoneController.clear();
 
-        // ⭐ استخدام Fade Transition عند الانتقال إلى صفحة الطلبات
+        //  special fade transition for navigation to orders page
         Navigator.pushReplacement(
           context,
           _fadePageRoute(const CustomerOrdersPage()),
@@ -325,24 +377,35 @@ class _BasketPageState extends State<BasketPage> {
   }
 
 
-  // --- الدوال المساعدة للتنسيق الجديد ---
+  // --- Helper functions for the new layout ---
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, LanguageProvider languageProvider) {
+    final isRTL = languageProvider.isRTL;
     return Row(
       children: [
-        // زر الرجوع
-        IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary),
-          onPressed: () => Navigator.pop(context),
-          tooltip: 'Back to Products',
+        // functional back button
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: IconButton(
+            icon: Icon(
+              isRTL 
+                ? Icons.arrow_forward_ios_rounded 
+                : Icons.arrow_back_ios_rounded, 
+              color: AppColors.primary,
+              size: 24,
+            ),
+            onPressed: () => Navigator.pop(context),
+            tooltip: languageProvider.getString('back'),
+          ),
         ),
         const SizedBox(width: 8),
         Text(
-          'Create New Customer Order',
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
+          languageProvider.getString('create_new_order'),
+          style: _getTextStyle(
+            isRTL,
             fontSize: 28,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -354,10 +417,11 @@ class _BasketPageState extends State<BasketPage> {
     final inCartQuantity = (item['cartQuantity'] ?? 0);
     final List<String> imageUrls = (item['imageUrls'] as List<String>?) ?? [];
     String? displayImageUrl;
+    final isRTL = context.read<LanguageProvider>().isRTL;
 
     if (imageUrls.isNotEmpty) {
       final String rawImageUrl = imageUrls.first;
-      // التحقق من URL الكامل أو إضافته
+      // Check if the URL is complete or needs to be appended
       if (rawImageUrl.startsWith('http://') || rawImageUrl.startsWith('https://')) {
         displayImageUrl = rawImageUrl;
       } else {
@@ -381,7 +445,7 @@ class _BasketPageState extends State<BasketPage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // الصورة
+          // image
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Container(
@@ -401,39 +465,47 @@ class _BasketPageState extends State<BasketPage> {
           ),
           const SizedBox(width: 16),
 
-          // التفاصيل
+          // details
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item['name'] ?? 'N/A',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                  style: _getTextStyle(
+                    isRTL,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Unit Price: \$${(item['price'] as num).toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                  style: _getTextStyle(
+                    isRTL,
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 if (stockWarning)
                   Text(
                     'Warning: Only $availableStock in stock!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.danger,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: _getTextStyle(
+                      isRTL,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.danger,
+                    ),
                   ),
               ],
             ),
           ),
 
-          // التحكم بالكمية
+          // cuantity controls
           Row(
             children: [
               IconButton(
@@ -444,7 +516,12 @@ class _BasketPageState extends State<BasketPage> {
               ),
               Text(
                 '$inCartQuantity',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: _getTextStyle(
+                  isRTL,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
               IconButton(
                 icon: Icon(Icons.add_circle_outline, color: inCartQuantity < availableStock ? AppColors.accent : AppColors.textSecondary.withOpacity(0.4)),
@@ -456,16 +533,18 @@ class _BasketPageState extends State<BasketPage> {
           ),
           const SizedBox(width: 16),
           
-          // الإجمالي الفرعي والحذف
+          // total price and remove button
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '\$${((item['price'] ?? 0.0) * inCartQuantity).toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+                style: _getTextStyle(
+                  isRTL,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(height: 4),
               IconButton(
@@ -480,6 +559,7 @@ class _BasketPageState extends State<BasketPage> {
   }
 
   Widget _buildBasketList() {
+    final isRTL = context.read<LanguageProvider>().isRTL;
     if (_isFetchingCart) {
       return Center(
         child: CircularProgressIndicator(color: AppColors.primary),
@@ -495,7 +575,11 @@ class _BasketPageState extends State<BasketPage> {
             const SizedBox(height: 16),
             Text(
               'Your Order is Empty. Add products to start.',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(color: AppColors.textSecondary),
+              style: _getTextStyle(
+                isRTL,
+                fontSize: 16,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -524,7 +608,8 @@ class _BasketPageState extends State<BasketPage> {
     );
   }
 
-  Widget _buildCheckoutSummary(BuildContext context) {
+  Widget _buildCheckoutSummary(BuildContext context, LanguageProvider languageProvider) {
+    final isRTL = languageProvider.isRTL;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -540,47 +625,49 @@ class _BasketPageState extends State<BasketPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Customer Details & Checkout',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                languageProvider.getString('customer_details_checkout'),
+                style: _getTextStyle(
+                  isRTL,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textPrimary,
                 ),
               ),
               const Divider(height: 30, color: AppColors.background),
               
-              // حقول النموذج
+              // fields for customer details
               _buildTextField(
                 controller: _companyNameController,
-                label: 'Company Name',
+                label: languageProvider.getString('company_name'),
                 icon: Icons.business_outlined,
-                validator: (value) => value!.isEmpty ? 'Company name is required' : null,
+                validator: (value) => value!.isEmpty ? languageProvider.getString('company_required') : null,
               ),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _customerNameController,
-                label: 'Contact Name',
+                label: languageProvider.getString('contact_name'),
                 icon: Icons.person_outline_rounded,
-                validator: (value) => value!.isEmpty ? 'Contact name is required' : null,
+                validator: (value) => value!.isEmpty ? languageProvider.getString('contact_required') : null,
               ),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _emailController,
-                label: 'Email',
+                label: languageProvider.getString('email'),
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) => value!.isEmpty ? 'Email is required' : null,
+                validator: (value) => value!.isEmpty ? languageProvider.getString('email_required') : null,
               ),
               const SizedBox(height: 16),
               _buildTextField(
                 controller: _phoneController,
-                label: 'Phone Number',
+                label: languageProvider.getString('phone_number'),
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
-                validator: (value) => value!.isEmpty ? 'Phone number is required' : null,
+                validator: (value) => value!.isEmpty ? languageProvider.getString('phone_required') : null,
               ),
               const SizedBox(height: 30),
 
-              // ملخص الإجمالي وزر الدفع
+              // summary and checkout button
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -588,14 +675,20 @@ class _BasketPageState extends State<BasketPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Grand Total',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.textSecondary),
+                        languageProvider.getString('grand_total'),
+                        style: _getTextStyle(
+                          isRTL,
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                       Text(
                         '\$${_displayTotalPrice.toStringAsFixed(2)}',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        style: _getTextStyle(
+                          isRTL,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.accent, // لون مميز للإجمالي
+                          color: AppColors.accent,
                         ),
                       ),
                     ],
@@ -611,7 +704,15 @@ class _BasketPageState extends State<BasketPage> {
                         : const Icon(Icons.shopping_cart_checkout_rounded, size: 28),
                     label: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(_isLoading ? 'Processing...' : 'Proceed Order', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        _isLoading ? languageProvider.getString('processing') : languageProvider.getString('proceed_order'), 
+                        style: _getTextStyle(
+                          isRTL,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -637,6 +738,7 @@ class _BasketPageState extends State<BasketPage> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final isRTL = context.read<LanguageProvider>().isRTL;
     return Theme(
       data: Theme.of(context).copyWith(
         textSelectionTheme: TextSelectionThemeData(
@@ -650,10 +752,10 @@ class _BasketPageState extends State<BasketPage> {
         keyboardType: keyboardType,
         validator: validator,
         cursorColor: AppColors.primary,
-        style: TextStyle(color: AppColors.textPrimary),
+        style: _getTextStyle(isRTL, color: AppColors.textPrimary),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: TextStyle(color: AppColors.textSecondary),
+          labelStyle: _getTextStyle(isRTL, color: AppColors.textSecondary),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7), width: 2),
@@ -663,7 +765,8 @@ class _BasketPageState extends State<BasketPage> {
             borderSide: BorderSide(color: AppColors.textSecondary.withOpacity(0.5)),
           ),
           prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
-          floatingLabelStyle: TextStyle(
+          floatingLabelStyle: _getTextStyle(
+            isRTL,
             color: AppColors.primary,
             fontWeight: FontWeight.bold,
           ),
@@ -674,39 +777,42 @@ class _BasketPageState extends State<BasketPage> {
 
 
   @override
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background, // لون الخلفية العام
-      body: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. العنوان الرئيسي وزر الرجوع
-            _buildHeader(context),
-            const SizedBox(height: 30),
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, _) => Scaffold(
+        backgroundColor: AppColors.background, // background color
+        body: Padding(
+          padding: const EdgeInsets.all(30.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Main header and back button
+              _buildHeader(context, languageProvider),
+              const SizedBox(height: 30),
 
-            // 2. المحتوى الرئيسي (سلة المشتريات + نموذج العميل)
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // الجانب الأيسر: قائمة المنتجات
-                  Expanded(
-                    flex: 3,
-                    child: _buildBasketList(),
-                  ),
-                  const SizedBox(width: 40),
+              // 2. Main content (basket + customer form)
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Left side: product list
+                    Expanded(
+                      flex: 3,
+                      child: _buildBasketList(),
+                    ),
+                    const SizedBox(width: 40),
 
-                  // الجانب الأيمن: نموذج العميل وملخص الطلب
-                  Expanded(
-                    flex: 2,
-                    child: _buildCheckoutSummary(context),
-                  ),
-                ],
+                    // Right side: customer form and order summary
+                    Expanded(
+                      flex: 2,
+                      child: _buildCheckoutSummary(context, languageProvider),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

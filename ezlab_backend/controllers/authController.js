@@ -7,8 +7,8 @@ const jwt = require('jsonwebtoken');
 const db = mysql.createConnection({
   host: 'localhost',
   user: 'Alansi77',
-  password: 'Alansi77@',
-  database: 'myproject'
+  password: 'root',
+  database: 'ezlab_database'
 });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key';
@@ -105,7 +105,7 @@ exports.login = (req, res) => {
               lastLoginAt: newLoginTime.toISOString() // Keep lastLoginAt in token for old token invalidation
             },
             JWT_SECRET,
-            { expiresIn: '1h' }
+            { expiresIn: '7d' }
           );
           console.log(`New token generated. lastLoginAt in token payload: ${newLoginTime.toISOString()}`);
 
@@ -131,8 +131,8 @@ exports.logout = (req, res) => {
     console.log(`Logout attempt for user ID: ${userId}`);
 
     db.query(
-        'UPDATE users SET lastLoginAt = ?, isLoggedIn = 0 WHERE id = ?', // Set isLoggedIn to 0
-        [new Date(0), userId], // Also reset lastLoginAt to epoch for good measure
+        'UPDATE users SET isLoggedIn = 0 WHERE id = ?',
+        [userId],
         (err, result) => {
             if (err) {
                 console.error('Logout error: Failed to reset isLoggedIn for user:', userId, err);

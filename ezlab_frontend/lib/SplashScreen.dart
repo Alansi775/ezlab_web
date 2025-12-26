@@ -18,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _iconScaleAnimation;
   late Animation<double> _textOpacityAnimation;
   late Animation<double> _glowAnimation;
-  late Animation<double> _crmOpacityAnimation; // ⭐ جديد: لـ CRM
+  late Animation<double> _crmOpacityAnimation; //  جديد: لـ CRM
 
   @override
   void initState() {
@@ -144,7 +144,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 30),
                   
-                  // ⭐ التعديل هنا: اسم الشركة NBK CRM
+                  //  التعديل هنا: اسم الشركة NBK CRM
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
